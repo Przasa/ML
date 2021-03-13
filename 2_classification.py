@@ -16,22 +16,21 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from sklearn.linear_model import SGDClassifier
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import StratifiedKFold, cross_val_predict, cross_val_score
 from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_score,precision_recall_curve as prt_curve
 from sklearn.base import clone, BaseEstimator
 from sklearn.exceptions import NotFittedError
 
 # selecting TODO: zrobic funkcje na to
-# _rand = np.random.randint(train_target.size)
-# rdigit = {
-#     'data' : wdata[_rand],
-#     'target' : wdata_target[_rand]}
-# showDigit(rdigit['data'])
-# print(sgd_clf.predict(rdigit['data'].reshape(1,-1)))
-
-def showDigit(mnist_data,index):
-    _piksels=mnist_data[index].reshape(28,28)
-    plt.imshow(_piksels,cmap=mpl.cm.binary)
+def pickRandom(datas,targets):
+    _rand = np.random.randint(train_target.size)
+    return datas[_rand],targets[_rand]
+    # rdigit = {
+    #     'data' : wdata[_rand],
+    #     'target' : wdata_target[_rand]}
+    # showDigit(rdigit['data'])
+    # print(sgd_clf.predict(rdigit['data'].reshape(1,-1)))
 
 def showDigit(sigle_data):
     _piksels=sigle_data.reshape(28,28)
@@ -145,8 +144,8 @@ print('F1 score (norm vs cross)', f1_score(test_pred6,test_target6),f1_score(tes
 if('wtarget6_pred_cross_score' not in globals() or True):
     test_target6_pred_score=[round(sgd_clf.decision_function(x.reshape(1,-1))[0],2) for x in test_data[:20]]
     test_target6_pred_cross_score= cross_val_predict(sgd_clf,test_data,test_target6,cv=3,method='decision_function')
+    # np.array(test_target6_pred_score) 
 print('DECISIONS (norm vs cross): ',test_target6_pred_score[:10],test_target6_pred_cross_score[0:10])
-
 # TODO: dodac porownanie krzywych z roznych modeli
 show_prt_curve(test_target6_pred_cross_score,test_target6,0.8)
 # TODO: show_roc_curve(targets,scores):
@@ -156,8 +155,7 @@ show_prt_curve(test_target6_pred_cross_score,test_target6,0.8)
 
 # %%
 
-
-from sklearn.ensemble import RandomForestClassifier
+# TODO: przenies to wyzej
 
 if('test_pred6_rfor' not in globals() or FORCE_CALC):
     rfor_clf = RandomForestClassifier(n_estimators=100,random_state=42)
@@ -169,12 +167,20 @@ confusion_matrix(test_target6,test_pred6_rfor)
 precision_score(test_pred6_rfor,test_target6)
 recall_score(test_pred6_rfor,test_target6)
 f1_score(test_pred6_rfor,test_target6)
-# print(scores_rfor)
+#TODO: jescze zrob krzywe prec, i ROC do tego --> porwnac krzywe najlepiej
 
 
 
 
 
-# %%
+# %% wlieloklasy
+
+#TODO: tez model tez zestawic z innymi (jak bylo)
+from sklearn.svm import SVC 
+
+svc_clf = SVC(gamma='auto',random_state=42)
+svc_clf.fit(train_data,train_target)
+pickRandom(train_data,train_target)
+
 
 # %%
