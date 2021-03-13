@@ -1,0 +1,121 @@
+pd.read_csv(csv_path)
+
+#PODGLAD
+housing.head()
+housing.info()
+housing["Odległość do oceanu"].value_counts() # .sort_values(ascending=False)
+housing.describe()
+housing.hist(bins=50, figsize=(20,15))
+housing["Mediana dochodów"].hist()
+
+#SPLITTING
+def test_set_check(identifier, test_ratio):
+    return crc32(np.int64(identifier)) & 0xffffffff < test_ratio * 2**32
+def split_train_test_by_id(data, test_ratio, id_column):
+    ids = data[id_column]
+    in_test_set = ids.apply(lambda id_: test_set_check(id_, test_ratio))
+    return data.loc[~in_test_set], data.loc[in_test_set]
+train_set, test_set = train_test_split(housing, test_size=0.2, random_state=42) //from sklearn.model_selection import train_test_split
+split = StratifiedShuffleSplit(n_splits=1, test_size=0.2, random_state=42)  //from sklearn.model_selection import StratifiedShuffleSplit
+for train_index, test_index in split.split(housing, housing["kat_dochodów"]):   
+    strat_train_set = housing.loc[train_index]
+    strat_test_set = housing.loc[test_index]
+
+
+#PLOTTING
+housing.plot(kind="scatter", x="Dł. geograficzna", y="Szer. geograficzna", alpha=0.4,
+    s=housing["Populacja"]/100, label="Populacja", figsize=(10,7),
+    c="Mediana cen mieszkań", cmap=plt.get_cmap("jet"), colorbar=True,
+    sharex=False)
+plt.legend()
+
+#CORRELATION
+corr_matrix = housing.corr()
+scatter_matrix(housing[attributes], figsize=(12, 8))    # from pandas.plotting import scatter_matrix
+
+#PREPARING FOR LEARNING 
+housing = strat_train_set.drop("Mediana cen mieszkań", axis=1) # usuwa etykiety w zbiorze uczącym
+sample_incomplete_rows.dropna(subset=["Całk. liczba sypialni"])    # pierwsza możliwość
+sample_incomplete_rows.drop("Całk. liczba sypialni", axis=1)       # druga możliwość
+sample_incomplete_rows["Całk. liczba sypialni"].fillna(median, inplace=True) #  trzecia możliwość, median = housing["Całk. liczba sypialni"].median() 
+imputer = SimpleImputer(strategy="median") # from sklearn.impute import SimpleImputer
+    imputer.fit(housing_num)
+    imputer.statistics_
+    imputer.strategy
+X = imputer.transform(housing_num)
+ordinal_encoder = OrdinalEncoder() #  from sklearn.preprocessing import OrdinalEncoder
+    housing_cat_encoded = ordinal_encoder.fit_transform(housing_cat) 
+    ordinal_encoder.categories_
+cat_encoder = OneHotEncoder() # from sklearn.preprocessing import OneHotEncoder, OneHotEncoder(sparse=False)
+    housing_cat_1hot = cat_encoder.fit_transform(housing_cat)
+    cat_encoder.categories_
+class CombinedAttributesAdder(BaseEstimator, TransformerMixin): # from sklearn.base import BaseEstimator, TransformerMixin
+    def __init__(self, add_bedrooms_per_room = True): # no *args or **kargs
+        self.add_bedrooms_per_room = add_bedrooms_per_room
+    def fit(self, X, y=None):
+        return self  # nothing else to do
+    def transform(self, X):
+        rooms_per_household = X[:, rooms_ix] / X[:, households_ix]
+        population_per_household = X[:, population_ix] / X[:, households_ix]
+        if self.add_bedrooms_per_room:
+            bedrooms_per_room = X[:, bedrooms_ix] / X[:, rooms_ix]
+            return np.c_[X, rooms_per_household, population_per_household,
+                         bedrooms_per_room]
+        else:
+            return np.c_[X, rooms_per_household, population_per_household]
+attr_adder = CombinedAttributesAdder(add_bedrooms_per_room=False)
+housing_extra_attribs = attr_adder.transform(housing.values)
+#PIPELINES
+num_pipeline = Pipeline([ # from sklearn.pipeline import Pipeline, from sklearn.preprocessing import StandardScaler
+        ('imputer', SimpleImputer(strategy="median")),
+        ('attribs_adder', CombinedAttributesAdder()),
+        ('std_scaler', StandardScaler()),
+    ]) #housing_num_tr = num_pipeline.fit_transform(housing_num)
+full_pipeline = ColumnTransformer([ #from sklearn.compose import ColumnTransformer
+        ("num", num_pipeline, num_attribs),
+        ("cat", OneHotEncoder(), cat_attribs),
+    ]) # housing_prepared = full_pipeline.fit_transform(housing)
+
+#LEARNING
+lin_reg.fit(housing_prepared, housing_labels) # from sklearn.linear_model import LinearRegression; lin_reg = LinearRegression()
+    housing_predictions = lin_reg.predict(housing_prepared)
+tree_reg.fit(housing_prepared, housing_labels) # from sklearn.tree import DecisionTreeRegressor, tree_reg = DecisionTreeRegressor(random_state=42)
+    housing_predictions = tree_reg.predict(housing_prepared)
+forest_reg.fit(housing_prepared, housing_labels) # from sklearn.ensemble import RandomForestRegressor, forest_reg = RandomForestRegressor(n_estimators=100, random_state=42)
+    housing_predictions = forest_reg.predict(housing_prepared)
+svm_reg.fit(housing_prepared, housing_labels) # from sklearn.svm import SVR, svm_reg = SVR(kernel="linear")
+    housing_predictions = svm_reg.predict(housing_prepared)
+
+
+#TUNING
+scores = cross_val_score(tree_reg, housing_prepared, housing_labels,scoring="neg_mean_squared_error", cv=10) # from sklearn.model_selection import cross_val_score # scores, scores.mean(), scores.std()
+param_grid = [    # sprawdza 12 (3×4) kombinacji hiperparametrów    {'n_estimators': [3, 10, 30], 'max_features': [2, 4, 6, 8]},    # następnie sprawdza 6 (2×3) kombinacji z wyłączonym parametrem bootstrap (False)    {'bootstrap': [False], 'n_estimators': [3, 10], 'max_features': [2, 3, 4]},  ]
+grid_search = GridSearchCV(forest_reg, param_grid, cv=5,scoring='neg_mean_squared_error',return_train_score=True)
+grid_search.fit(housing_prepared, housing_labels)
+    grid_search.best_params_
+    grid_search.best_estimator_
+    cvres = grid_search.cv_results_
+param_distribs = {        'n_estimators': randint(low=1, high=200),        'max_features': randint(low=1, high=8),    } # from scipy.stats import randint
+rnd_search = RandomizedSearchCV(forest_reg, param_distributions=param_distribs,n_iter=10, cv=5, scoring='neg_mean_squared_error', random_state=42) # from sklearn.model_selection import RandomizedSearchCV
+rnd_search.fit(housing_prepared, housing_labels)
+    feature_importances = grid_search.best_estimator_.feature_importances_
+    cvres = rnd_search.cv_results_
+    final_model = grid_search.best_estimator_
+
+#ERRORS
+lin_mse = mean_squared_error(housing_labels, housing_predictions) # from sklearn.metrics import mean_squared_error
+lin_rmse = np.sqrt(lin_mse)
+    forest_rmse_scores = np.sqrt(-forest_scores)
+lin_mae = mean_absolute_error(housing_labels, housing_predictions) # from sklearn.metrics import mean_absolute_error
+for mean_score, params in zip(cvres["mean_test_score"], cvres["params"]):
+    print(np.sqrt(-mean_score), params)
+X_test_prepared = full_pipeline.transform(X_test)
+final_predictions = final_model.predict(X_test_prepared)
+squared_errors = (final_predictions - y_test) ** 2
+np.sqrt(stats.t.interval(confidence, len(squared_errors) - 1,loc=squared_errors.mean(),scale=stats.sem(squared_errors))) #from scipy import stats,  confidence = 0.95
+
+
+#MISC
+housing["kat_dochodów"] = pd.cut(housing["Mediana dochodów"],bins=[0., 1.5, 3.0, 4.5, 6., np.inf],labels=[1, 2, 3, 4, 5])
+geom_distrib=geom(0.5).rvs(10000, random_state=42) #from scipy.stats import geom # plt.hist(geom_distrib, bins=50)#plt.show()
+expon_distrib=expon(scale=1).rvs(10000, random_state=42)#from scipy.stats import expon # plt.hist(geom_distrib, bins=50)#plt.show()

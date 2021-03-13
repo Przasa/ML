@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"python.condaPath": "C:\\Users\\dj6dvj\\Anaconda3\\envs\\tf2",
+		"python.pythonPath": "c:\\Users\\dj6dvj\\Anaconda3\\envs\\tf2\\python.exe"
+	}
+}
