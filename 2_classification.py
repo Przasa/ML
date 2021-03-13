@@ -1,18 +1,17 @@
 #%% loading data
-
-import set_workspace
-
 from sklearn.datasets import fetch_openml
 
 def load_data():
     mnist = fetch_openml('mnist_784',version=1)
     return mnist
 
-
 mnist= load_data()
 print('data loaded')
 
+
+
 #%% helper funtions
+import set_workspace as helpers
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -22,6 +21,14 @@ from sklearn.metrics import confusion_matrix, precision_score, recall_score, f1_
 from sklearn.base import clone, BaseEstimator
 from sklearn.exceptions import NotFittedError
 
+# selecting TODO: zrobic funkcje na to
+# _rand = np.random.randint(train_target.size)
+# rdigit = {
+#     'data' : wdata[_rand],
+#     'target' : wdata_target[_rand]}
+# showDigit(rdigit['data'])
+# print(sgd_clf.predict(rdigit['data'].reshape(1,-1)))
+
 def showDigit(mnist_data,index):
     _piksels=mnist_data[index].reshape(28,28)
     plt.imshow(_piksels,cmap=mpl.cm.binary)
@@ -30,13 +37,14 @@ def showDigit(sigle_data):
     _piksels=sigle_data.reshape(28,28)
     plt.imshow(_piksels,cmap=mpl.cm.binary)
 
-def splitData(mnist_dataset,train_ratio):
+def splitData(mnist_dataset,train_ratio):   # TODO: juz nie potrzebne
     train_size = np.int(train_ratio*mnist_dataset.target.size)
     return mnist_dataset.data[:train_size],mnist_dataset.target[:train_size],mnist_dataset.data[train_size:],mnist_dataset.target[train_size:] 
 
+
 def get_strat_predict(model,splits,inputs,outputs):
     predicts,targets = [],[]
-    sfold = StratifiedKFold(n_splits=splits,random_state=42)
+    sfold = StratifiedKFold(n_splits=splits,random_state=42,shuffle=True)
     for train_index , test_index in sfold.split(inputs,outputs):
         inputs_train, inputs_test = inputs[train_index], inputs[test_index]
         outputs_train, outputs_test = outputs[train_index], outputs[test_index]
@@ -46,17 +54,11 @@ def get_strat_predict(model,splits,inputs,outputs):
         predicts.append(outputs_pred)
     return np.asarray(predicts), np.asarray(targets)
 
-class MyBlankEstimator(BaseEstimator):
-    def fit(self,X,y=None):
-        pass
-    def predict(self,X):
-        return np.zeros((len(X),1),dtype=bool) 
 
-# TODO: show_roc_curve(targets,scores):
 
 # TODO: jeszcze zoom na to
 def show_prt_curve(scores,targets,treshold):
-    # _prec,_rec,_tresh = prt_curve(targets,scores)
+    _prec,_rec,_tresh = prt_curve(targets,scores)
     plt.plot(_tresh,_prec[:-1])
     plt.plot(_tresh,_rec[:-1])
     _arg_prec_90 = np.argmax(_prec>treshold)
@@ -69,7 +71,28 @@ def show_prt_curve(scores,targets,treshold):
     plt.grid(True)
     plt.legend(['precyzja','pelnosc','precyzja_'+str(treshold),'pelnosc_'+str(treshold)],loc='best')
     plt.axis(xlim=(-40000,40000),ylim=(0,1))    
-    save_fig('3_klasyfikacja_recalls')
+    helpers.save_fig('3_klasyfikacja_recalls')
+
+
+class MyBlankEstimator(BaseEstimator):
+    def fit(self,X,y=None):
+        pass
+    def predict(self,X):
+        return np.zeros((len(X),1),dtype=bool) 
+
+class StoreData():
+    def __init__(self,entire_dataset,train_ratio):
+        train_size = np.int(train_ratio*entire_dataset.target.size)
+        self.train_data, self.train_target, self.test_data, self.test_target=entire_dataset.data[:train_size],entire_dataset.target[:train_size],entire_dataset.data[train_size:],entire_dataset.target[train_size:] 
+    # def __init__(self,train_data,train_target,test_data,test_target):
+    #     self.train_data, self.train_target, self.test_data, self.test_target = train_data,train_target,test_data,test_target
+    def getTrainData(self):
+        return self.train_data, self.train_target
+    def getTestData(self):
+        return self.test_data, self.test_target
+    def getData(self):
+        return self.train_data, self.train_target,self.test_data, self.test_target
+
 
 
 
@@ -78,63 +101,75 @@ print('funkcje przygotowane')
 FORCE_CALC=False
 
 # podzial danych:
-if('wdata_target' not in globals() or FORCE_CALC):
+if('train_data' not in globals() or FORCE_CALC):
     train_ratio=0.8
-    train_data, train_target, test_data,test_target = splitData(mnist,train_ratio)
-    wdata,wtarget,wtarget6 = train_data,train_target.astype(int),(train_target.astype(int) == 6)
-     
+    data_stored = StoreData(entire_dataset=mnist,train_ratio=0.8)
+    train_data, train_target, test_data, test_target = data_stored.getData()
+    train_target6,test_target6  = train_target.astype(int)==6,test_target.astype(int)==6
 
 # uczymy sie.
 if('sgd_clf' not in globals() or FORCE_CALC):
     sgd_clf = SGDClassifier(max_iter=1000,tol=1e-3,random_state=42)
-    sgd_clf.fit(X=wdata,y=wtarget6)
-if('wtarget6_pred' not in globals() or FORCE_CALC):
-    wtarget6_pred=sgd_clf.predict(wdata)
-if('wtarget6_pred_strat_m' not in globals() or FORCE_CALC):
-    wtarget6_pred_strat_m,wtarget6_strat_m  = get_strat_predict(model=clone(sgd_clf),splits=3,inputs=wdata,outputs=wtarget6)   #based on StratifiedFold
-if('wtarget6_pred_cross' not in globals() or FORCE_CALC):
-    wtarget6_pred_cross=cross_val_predict(sgd_clf,wdata,wtarget6,cv=3)
+    sgd_clf.fit(X=train_data,y=train_target6)
+if('test_pred6' not in globals() or FORCE_CALC):
+    test_pred6=sgd_clf.predict(test_data)
+if('test_pred6_strats' not in globals() or FORCE_CALC):
+    test_pred6_strats,test_target6_strats  = get_strat_predict(model=clone(sgd_clf),splits=3,inputs=test_data,outputs=test_target6)   #based on StratifiedFold
+if('test_pred6_cross' not in globals() or FORCE_CALC):
+    test_pred6_cross=cross_val_predict(sgd_clf,test_data,test_target6,cv=3)
+if('test_pred6_rfor' not in globals() or FORCE_CALC):
+    rfor_clf = RandomForestClassifier(n_estimators=100,random_state=42)
+    rfor_clf.fit(train_data,train_target)
+    test_pred6_rfor= rfor_clf.predict(test_data)
+
+
     #ciekawe: uzyskujemy gorsze wyniki, poniewaz tu pracujemy z mniejszymi zbiorami.
 
 
-# selecting TODO: zrobic funkcje na to
-# _rand = np.random.randint(train_target.size)
-# rdigit = {
-#     'data' : wdata[_rand],
-#     'target' : wdata_target[_rand]}
-# showDigit(rdigit['data'])
-# print(sgd_clf.predict(rdigit['data'].reshape(1,-1)))
-
+# TODO: moze jakas funkcja/klasa raportujaca? moze w set_workspace
 #porownujemy winiki
-corrects=round(sum(wtarget6_pred==wtarget6)/len(wtarget6),2)
-corrects_strat=[round(sum(x==y)/len(y),2) for x,y in zip(wtarget6_pred_strat_m,wtarget6_strat_m)]
-corrects_cross=round(sum(wtarget6_pred_cross==wtarget6)/len(wtarget6),2)
-print('CORRECTS[%]: ',corrects)
-print('CORRECTS[%] (STRAT 3): ',corrects_strat)
-print('CORRECTS[%] (CROSS): ',corrects_cross)
-print('CONF MATRIX: ',confusion_matrix(wtarget6,wtarget6_pred))
-print('CONF MATRIX (CROSS): ',confusion_matrix(wtarget6,wtarget6_pred_cross))
-print('PRECYZJA (norm vs cross): ',round(precision_score(wtarget6_pred,wtarget6),2),round(precision_score(wtarget6_pred_cross,wtarget6)),2)
-print('PELNOSC (norm vs cross): ',round(recall_score(wtarget6_pred,wtarget6),2),round(recall_score(wtarget6_pred_cross,wtarget6)),2)
-print('F1 score (norm vs cross)', round(f1_score(wtarget6_pred,wtarget6),2),round(f1_score(wtarget6_pred_cross,wtarget6)),2)
+corrects=round(sum(test_pred6==test_target6)/len(test_target6),4)
+corrects_strat=[round(sum(x==y)/len(y),4) for x,y in zip(test_pred6_strats,test_target6_strats)]
+corrects_cross=round(sum(test_pred6_cross==test_target6)/len(test_target6),4)
+corrects_rfor= round(sum(test_target==test_pred6_rfor)/len(test_target),4)
 
-#funckje decyzyjne
-decisions=[round(sgd_clf.decision_function(x.reshape(1,-1))[0],2) for x in wdata[:20]]
-if('wtarget6_pred_cross_score' not in globals()):
-    wtarget6_pred_cross_score= cross_val_predict(sgd_clf,wdata,wtarget6,cv=3,method='decision_function')
-print('DECISIONS: ',decisions)
+print('CORRECTS[%] (norm, strat, cross,rfor): ',corrects, max(corrects_strat), corrects_cross,corrects_rfor)
+print('CONF MATRIX: (norm, cross)') ; print(confusion_matrix(test_target6,test_pred6));print(confusion_matrix(test_target6,test_pred6_cross))
+# TODO jeszcze todac stratsy do conf_matrix
+print('PRECYZJA (norm vs cross): ',precision_score(test_pred6,test_target6),precision_score(test_pred6_cross,test_target6))
+print('PELNOSC (norm vs cross): ',recall_score(test_pred6,test_target6),2,recall_score(test_pred6_cross,test_target6))
+print('F1 score (norm vs cross)', f1_score(test_pred6,test_target6),f1_score(test_pred6_cross,test_target6))
 
-show_prt_curve(wtarget6_pred_cross_score,wtarget6,0.8)
-# show_roc_curve(targ)
+#funckje i krzywe decyzyjne
+# TODO: Warto dodac jeszcze cos 
+if('wtarget6_pred_cross_score' not in globals() or True):
+    test_target6_pred_score=[round(sgd_clf.decision_function(x.reshape(1,-1))[0],2) for x in test_data[:20]]
+    test_target6_pred_cross_score= cross_val_predict(sgd_clf,test_data,test_target6,cv=3,method='decision_function')
+print('DECISIONS (norm vs cross): ',test_target6_pred_score[:10],test_target6_pred_cross_score[0:10])
 
-
+# TODO: dodac porownanie krzywych z roznych modeli
+show_prt_curve(test_target6_pred_cross_score,test_target6,0.8)
+# TODO: show_roc_curve(targets,scores):
 
 
 
 
 # %%
-# %%
 
+
+from sklearn.ensemble import RandomForestClassifier
+
+if('test_pred6_rfor' not in globals() or FORCE_CALC):
+    rfor_clf = RandomForestClassifier(n_estimators=100,random_state=42)
+    rfor_clf.fit(train_data,train_target6)
+    test_pred6_rfor= rfor_clf.predict(test_data)
+
+corrects_rfor= round(sum(test_target==test_pred6_rfor)/len(test_target),4)
+confusion_matrix(test_target6,test_pred6_rfor)
+precision_score(test_pred6_rfor,test_target6)
+recall_score(test_pred6_rfor,test_target6)
+f1_score(test_pred6_rfor,test_target6)
+# print(scores_rfor)
 
 
 
