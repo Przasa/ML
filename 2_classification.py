@@ -24,7 +24,7 @@ from sklearn.exceptions import NotFittedError
 
 # selecting TODO: zrobic funkcje na to
 def pickRandom(datas,targets):
-    _rand = np.random.randint(train_target.size)
+    _rand = np.random.randint(targets.size)
     return datas[_rand],targets[_rand]
     # rdigit = {
     #     'data' : wdata[_rand],
@@ -118,7 +118,7 @@ if('test_pred6_cross' not in globals() or FORCE_CALC):
     test_pred6_cross=cross_val_predict(sgd_clf,test_data,test_target6,cv=3)
 if('test_pred6_rfor' not in globals() or FORCE_CALC):
     rfor_clf = RandomForestClassifier(n_estimators=100,random_state=42)
-    rfor_clf.fit(train_data,train_target)
+    rfor_clf.fit(train_data,train_target6)
     test_pred6_rfor= rfor_clf.predict(test_data)
 
 
@@ -130,14 +130,29 @@ if('test_pred6_rfor' not in globals() or FORCE_CALC):
 corrects=round(sum(test_pred6==test_target6)/len(test_target6),4)
 corrects_strat=[round(sum(x==y)/len(y),4) for x,y in zip(test_pred6_strats,test_target6_strats)]
 corrects_cross=round(sum(test_pred6_cross==test_target6)/len(test_target6),4)
-corrects_rfor= round(sum(test_target==test_pred6_rfor)/len(test_target),4)
+corrects_rfor= round(sum(test_target6==test_pred6_rfor)/len(test_target6),4)
+cm_norm=confusion_matrix(test_target6,test_pred6).reshape(1,4)
+cm_cross=confusion_matrix(test_target6,test_pred6_cross).reshape(1,4)
+cm_strat=confusion_matrix(test_target6_strats[np.argmax(corrects_strat)],test_pred6_strats[np.argmax(corrects_strat)]).reshape(1,4)
+cm_rfor=confusion_matrix(test_target6,test_pred6_rfor).reshape(1,4)
+ps_norm=round(precision_score(test_target6,test_pred6),4)
+ps_cross=round(precision_score(test_target6,test_pred6_cross),4)
+ps_strat=round(precision_score(test_target6_strats[np.argmax(corrects_strat)],test_pred6_strats[np.argmax(corrects_strat)]),4)
+ps_rfor=round(precision_score(test_target6,test_pred6_rfor),4)
+rs_norm=round(recall_score(test_target6,test_pred6),4)
+rs_cross=round(recall_score(test_target6,test_pred6_cross),4)
+rs_strat=round(recall_score(test_target6_strats[np.argmax(corrects_strat)],test_pred6_strats[np.argmax(corrects_strat)]),4)
+rs_rfor=round(recall_score(test_target6,test_pred6_rfor),4)
+f1_norm=round(f1_score(test_target6,test_pred6),4)
+f1_cross=round(f1_score(test_target6,test_pred6_cross),4)
+f1_strat=round(f1_score(test_target6_strats[np.argmax(corrects_strat)],test_pred6_strats[np.argmax(corrects_strat)]),4)
+f1_rfor=round(f1_score(test_target6,test_pred6_rfor),4)
 
-print('CORRECTS[%] (norm, strat, cross,rfor): ',corrects, max(corrects_strat), corrects_cross,corrects_rfor)
-print('CONF MATRIX: (norm, cross)') ; print(confusion_matrix(test_target6,test_pred6));print(confusion_matrix(test_target6,test_pred6_cross))
-# TODO jeszcze todac stratsy do conf_matrix
-print('PRECYZJA (norm vs cross): ',precision_score(test_pred6,test_target6),precision_score(test_pred6_cross,test_target6))
-print('PELNOSC (norm vs cross): ',recall_score(test_pred6,test_target6),2,recall_score(test_pred6_cross,test_target6))
-print('F1 score (norm vs cross)', f1_score(test_pred6,test_target6),f1_score(test_pred6_cross,test_target6))
+print('CORRECTS[%]:','\n\tnorm:\t',corrects,'\n\tcross:\t', corrects_cross,'\n\tstrat:\t', max(corrects_strat),'\n\trfor:\t',corrects_rfor)
+print('CONFUSION MATRIX [TN(=wylapane zle), FP(=brudy), FN(=stracone), TP(=zlapane dobre)]:' , '\n\tnorm:\t',cm_norm,'\n\tcross:\t',cm_cross,'\n\tstrat:\t',cm_strat,'\n\trfor:\t',cm_rfor)
+print('PRECISION: tp / (tp + fp)','\n\tnorm:\t',ps_norm,'\n\tcross:\t',ps_cross,'\n\tstart:\t',ps_strat,'\n\trfor:\t',ps_rfor)
+print('RECALL: tp / (tp + fn)','\n\tnorm:\t',rs_norm,'\n\tcross:\t',rs_cross,'\n\tstart:\t',rs_strat,'\n\trfor:\t',rs_rfor)
+print('F1 SCORE (F1 = 2 * (precision * recall) / (precision + recall) ):','\n\tnorm:\t',f1_norm,'\n\tcross:\t',f1_cross,'\n\tstart:\t',f1_strat,'\n\trfor:\t',f1_rfor)
 
 #funckje i krzywe decyzyjne
 # TODO: Warto dodac jeszcze cos 
@@ -153,34 +168,70 @@ show_prt_curve(test_target6_pred_cross_score,test_target6,0.8)
 
 
 
-# %%
-
-# TODO: przenies to wyzej
-
-if('test_pred6_rfor' not in globals() or FORCE_CALC):
-    rfor_clf = RandomForestClassifier(n_estimators=100,random_state=42)
-    rfor_clf.fit(train_data,train_target6)
-    test_pred6_rfor= rfor_clf.predict(test_data)
-
-corrects_rfor= round(sum(test_target==test_pred6_rfor)/len(test_target),4)
-confusion_matrix(test_target6,test_pred6_rfor)
-precision_score(test_pred6_rfor,test_target6)
-recall_score(test_pred6_rfor,test_target6)
-f1_score(test_pred6_rfor,test_target6)
-#TODO: jescze zrob krzywe prec, i ROC do tego --> porwnac krzywe najlepiej
 
 
+# %% Klasyfikacja wieloklasowa
+# inene metody tez mozesz tak potraktowac.
 
+# 0. SVC clf
+# 0. One vs Rest
+# 1. sross_val_score(sgd_clf,xscaled,...)
+# 2. cross_val_predict(sgd_clf,xscaled,...)
+# 3. confusion_matrix(^)
+# 4. plot conf_matrix (zwykly i przeskalowany)
 
-
-# %% wlieloklasy
 
 #TODO: tez model tez zestawic z innymi (jak bylo)
 from sklearn.svm import SVC 
+from sklearn.multiclass import OneVsRestClassifier  # takie rzeczy to tylko dla multiclass
+from sklearn.model_selection import cross_val_predict, cross_val_score
+from sklearn.preprocessing import StandardScaler
 
-svc_clf = SVC(gamma='auto',random_state=42)
-svc_clf.fit(train_data,train_target)
-pickRandom(train_data,train_target)
+_rx,_ry=pickRandom(test_data,test_target)
+showDigit(_rx)
 
+# # TODO: 1000 sampli to za malo na dobre uczenie. Przygotuj sie na troche wiecej.
+# if('svc_clf' not in globals() or FORCE_CALC):
+#     svc_clf = SVC(gamma='auto',random_state=42)
+#     svc_clf.fit(train_data[:1000],train_target[:1000])
+# ry_pred_svc=svc_clf.predict([_rx])
+# scores_svc=svc_clf.decision_function([_rx])    
+# ry_pred_svc_form=svc_clf.classes_[np.argmax(scores_svc)]
 
-# %%
+# # TODO: porownac z SGD_CLF
+
+# #opakowanie od OVR
+# if(ovr_svc_clf not in globals() or FORCE_CALC):
+#     ovr_svc_clf = OneVsRestClassifier(svc_clf)
+#     ovr_svc_clf.fit(train_data[:1000],train_target[:1000]) 
+# ry_pred_ovrsvc= ovr_svc_clf.predict([_rx])
+# scores_ovrsvc=ovr_svc_clf.decision_function([_rx]) 
+# classes_ovrsvc = ovr_svc_clf.estimators_ 
+
+# print("PREDICT COMPARISION:\n\tSVC:\t\t",ry_pred_svc[0],"\n\tOVR(SVC):\t",ry_pred_ovrsvc[0])
+# print("SCORES COMPARISION:\n\tSVC:\t",scores_svc,"\n\tOVR(SVC):\t",scores_ovrsvc)
+
+#skalowanie potrzeben do pracy z cross_val_score i cross_val_predict
+#ponadto, skalowanie pozwala na uzyskanei lepdzych wynikow TODO:
+scaler = StandardScaler()
+train_data_scaled=scaler.fit_transform(train_data.astype(np.float64))
+test_data_scaled = scaler.fit_transform(test_data.astype(np.float64))
+
+# sprawdzinay krzyzowe, przewiduje wyniki dla partii, wobec ktorych nie bylo jeszcze uczenia (odklada na pozniej)
+# svc_clf = SVC(gamma='auto',random_state=42)
+# svc_clf.fit(train_data_scaled[:1000],train_target[:1000])
+score_cross_svc= cross_val_score(svc_clf,X=train_data_scaled[:2000],y=train_target[:2000],cv=4,scoring="accuracy")
+pred_cross_svc= cross_val_predict(svc_clf,X=train_data_scaled[:2000],y=train_target[:2000],cv=4)
+
+#1.04.2021: Teraz tu jestes. dzialaj odtad.
+
+# conf_mx = confusion_matrix(...)
+
+# def plot_confusion_matrix(matrix):
+# plt.matshow(conf_mx, cmap=plt.cm.gray)
+# plt.matshow(norm_conf_mx, cmap=plt.cm.gray)
+# fig.colorbar(cax)
+
+print("OK")
+
+# %% Klasyfikacja wieloetykietowa
