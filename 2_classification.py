@@ -188,50 +188,112 @@ from sklearn.model_selection import cross_val_predict, cross_val_score
 from sklearn.preprocessing import StandardScaler
 
 _rx,_ry=pickRandom(test_data,test_target)
-showDigit(_rx)
+# showDigit(_rx)
 
 # # TODO: 1000 sampli to za malo na dobre uczenie. Przygotuj sie na troche wiecej.
-# if('svc_clf' not in globals() or FORCE_CALC):
-#     svc_clf = SVC(gamma='auto',random_state=42)
-#     svc_clf.fit(train_data[:1000],train_target[:1000])
-# ry_pred_svc=svc_clf.predict([_rx])
-# scores_svc=svc_clf.decision_function([_rx])    
-# ry_pred_svc_form=svc_clf.classes_[np.argmax(scores_svc)]
+if('svc_mclf' not in globals() or FORCE_CALC):
+    svc_mclf = SVC(gamma='auto',random_state=42)
+    svc_mclf.fit(train_data[:1000],train_target[:1000])
 
-# # TODO: porownac z SGD_CLF
+    ry_pred_svc=svc_mclf.predict([_rx])
+    scores_svc=svc_mclf.decision_function([_rx])    
+    ry_pred_svc_form=svc_mclf.classes_[np.argmax(scores_svc)]
 
-# #opakowanie od OVR
-# if(ovr_svc_clf not in globals() or FORCE_CALC):
-#     ovr_svc_clf = OneVsRestClassifier(svc_clf)
-#     ovr_svc_clf.fit(train_data[:1000],train_target[:1000]) 
-# ry_pred_ovrsvc= ovr_svc_clf.predict([_rx])
-# scores_ovrsvc=ovr_svc_clf.decision_function([_rx]) 
-# classes_ovrsvc = ovr_svc_clf.estimators_ 
+# TODO: moze opakowac jakas metode do tych rzeczy
+# #opakowanie od OVR (metoda OVR jest ustawiana automatycznie, dla klasyfiacji wielokasowej, ale mozno to wywolac jawnie.)
+if('svc_mclf_ovr' not in globals() or FORCE_CALC):
+    svc_mclf_ovr = OneVsRestClassifier(SVC())
+    svc_mclf_ovr.fit(train_data[:1000],train_target[:1000]) 
 
-# print("PREDICT COMPARISION:\n\tSVC:\t\t",ry_pred_svc[0],"\n\tOVR(SVC):\t",ry_pred_ovrsvc[0])
-# print("SCORES COMPARISION:\n\tSVC:\t",scores_svc,"\n\tOVR(SVC):\t",scores_ovrsvc)
+    ry_pred_svc_ovr= svc_mclf_ovr.predict([_rx])
+    scores_svc_ovr=svc_mclf_ovr.decision_function([_rx]) 
+    classes_svc_ovr = svc_mclf_ovr.estimators_ 
+
+if('sgd_mclf' not in globals() or FORCE_CALC):
+    sgd_mclf = SGDClassifier(random_state=42)
+    sgd_mclf.fit(X=train_data[:1000],y=train_target[:1000])
+    
+    ry_pred_sgd=sgd_mclf.predict([_rx])
+    scores_sgd = sgd_mclf.decision_function([_rx])
+    ry_pred_sgd_form=sgd_mclf.classes_[np.argmax(scores_sgd)]
+    
+
+
+print("PREDICT COMPARISION:\n\tSVC:\t\t",ry_pred_svc[0],"\n\tOVR(SVC):\t",ry_pred_svc_ovr[0],"\n\tSGD:\t",ry_pred_sgd[0])
+print("SCORES COMPARISION:\n\tSVC:\t",scores_svc,"\n\tOVR(SVC):\t",scores_svc_ovr,"\n\tOVR(SVC):\t",scores_sgd)
+
+#::::::::::::::analiza bledo:::::::::::::::
 
 #skalowanie potrzeben do pracy z cross_val_score i cross_val_predict
-#ponadto, skalowanie pozwala na uzyskanei lepdzych wynikow TODO:
+# ponadto, skalowanie pozwala na uzyskanei lepdzych wynikow 
+# TODO: porownac z uczeniem bez skalowania
 scaler = StandardScaler()
 train_data_scaled=scaler.fit_transform(train_data.astype(np.float64))
 test_data_scaled = scaler.fit_transform(test_data.astype(np.float64))
 
 # sprawdzinay krzyzowe, przewiduje wyniki dla partii, wobec ktorych nie bylo jeszcze uczenia (odklada na pozniej)
-# svc_clf = SVC(gamma='auto',random_state=42)
-# svc_clf.fit(train_data_scaled[:1000],train_target[:1000])
-score_cross_svc= cross_val_score(svc_clf,X=train_data_scaled[:2000],y=train_target[:2000],cv=4,scoring="accuracy")
-pred_cross_svc= cross_val_predict(svc_clf,X=train_data_scaled[:2000],y=train_target[:2000],cv=4)
+# ...ale nie widze sposobu zeby uzyc tego sprawdziany dla danych testowych (moze dac wyuczony klasyfikator? ... nie raczej nie ma to znaczenie)
+if('train_score_crosssvc' not in globals() or FORCE_CALC):
+    train_score_crosssvc= cross_val_score(svc_mclf,X=train_data_scaled[:2000],y=train_target[:2000],cv=4,scoring="accuracy")
+    train_pred_crosssvc= cross_val_predict(svc_mclf,X=train_data_scaled[:2000],y=train_target[:2000],cv=4)
+    # trenowanie od zera daje troszeczke gorsze wyniki (~0.11%)
+    # score_cross_svc2= cross_val_score(SVC(),X=train_data_scaled[:2000],y=train_target[:2000],cv=4,scoring="accuracy")
+    # pred_cross_svc2= cross_val_predict(SVC(),X=train_data_scaled[:2000],y=train_target[:2000],cv=4)
 
 #1.04.2021: Teraz tu jestes. dzialaj odtad.
 
-# conf_mx = confusion_matrix(...)
+conf_mx = confusion_matrix(train_target[:2000],train_pred_crosssvc)
+conf_mx_norm=conf_mx/conf_mx.sum(axis=1,keepdims=True)      #normalizacja ze wzgledu na liczb probek
+np.fill_diagonal(conf_mx_norm,0)                            
+plt.matshow(conf_mx_norm,cmap=plt.cm.gray) #bez CMAP, rysunek jest kolorowy
 
-# def plot_confusion_matrix(matrix):
-# plt.matshow(conf_mx, cmap=plt.cm.gray)
-# plt.matshow(norm_conf_mx, cmap=plt.cm.gray)
-# fig.colorbar(cax)
 
 print("OK")
 
-# %% Klasyfikacja wieloetykietowa
+
+# %% Klasyfikacja wieloetykietowa (jeden sampel ma wiele etykiet)
+from sklearn.neighbors import KNeighborsClassifier
+
+train_target_odd  = (train_target.astype(int) % 2) ==1
+train_target_big = (train_target.astype(int) >= 7)
+train_target_mlabel = np.c_[train_target_odd,train_target_big]   # moze opakowac w funkcje
+
+if('kn_clf' not in globals() or FORCE_CALC):
+    kn_clf = KNeighborsClassifier()
+    kn_clf.fit(train_data[:1000],train_target_mlabel[:1000])
+    ry_pred_kn=kn_clf.predict([_rx])
+
+if('kn_clf_cross' not in globals() or FORCE_CALC):
+    train_target_mlabel_pred_kn= cross_val_predict(kn_clf,X=train_data[:1000],y=train_target_mlabel[:1000])
+    f1_mlabel_kn=f1_score(train_target_mlabel[:1000],train_target_mlabel_pred_kn[:1000],average="weighted") # hipeparametr "avarage" do ustalenia sily wag
+
+
+def makeSomeNoise(input):#   :)
+    if(len(input.shape)>1):
+        noise = np.random.randint(0,100,(len(input),len(input[0])))
+    else:        
+        noise = np.random.randint(0,100,len(input))
+
+    return input+noise
+
+
+# klasyfikacja wielowyjciowo-wieloklasowa
+if('pred_kn' not in globals() or FORCE_CALC):
+    a,b = pickRandom(test_data,test_target)
+    _X = makeSomeNoise(train_data)
+    _y = train_data
+    _sX=makeSomeNoise(a)
+    _sy=a
+    
+    kn_clf_mo = KNeighborsClassifier()
+    kn_clf_mo.fit(_X[:1000],_y[:1000])
+    pred_kn= kn_clf_mo.predict([_sX])
+
+plt.subplot(121); showDigit(_sX)
+plt.subplot(122); showDigit(pred_kn)
+
+
+
+
+print('Zrobione')
+# %%
