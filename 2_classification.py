@@ -106,12 +106,66 @@ if('train_data' not in globals() or FORCE_CALC):
     train_data, train_target, test_data, test_target = data_stored.getData()
     train_target6,test_target6  = train_target.astype(int)==6,test_target.astype(int)==6
 
+class SingleCLF():
+    def __init__(self,classifier,name,train_data,train_target,test_data,test_target):
+        self.name=name
+        self.classifier=classifier
+        self.train_data =train_data
+        self.train_target = train_target
+        self.test_data = test_data
+        self.test_target =test_target
+    
+    def train(self):
+        if(hasattr(self,'test_pred')): 
+            return
+        self.classifier.fit(X=self.train_data,y=self.train_target)
+        self.test_pred =self.classifier.predict(self.test_data)
+
+    def set_pred(self,pred):
+        self.test_pred =pred
+
+class Comparer():
+    def __init__(self):
+        self.CLSFs=[]
+    def insert_clf(self,SingleCLF):
+        if(SingleCLF.name not in  [x.name for x in self.CLSFs]):
+            self.CLSFs.append(SingleCLF)
+    def train_clfs(self):
+        for CLF in self.CLSFs:
+            CLF.train()
+    def compare_clfs(self):
+        self.__compare_corrects()
+    def __compare_corrects(self):
+        print("CORRECTS:")
+        for CLF in self.CLSFs:
+            result = round(sum(CLF.test_pred==CLF.test_target)/len(CLF.test_target),4)   
+            CLF.corrects=result
+            print("\t",CLF.name,":\t:",CLF.corrects)
+
+if('comparer' not in globals() or FORCE_CALC): 
+    comparer =  Comparer()
+sgd_clf_sl = SingleCLF(SGDClassifier(max_iter=1000,tol=1e-3,random_state=42),'sgd_clf_sl',train_data,train_target,test_data,test_target)
+sgd_clf_sl.train()
+comparer.insert_clf(sgd_clf_sl)
+sgd_clfCROSS_sl = SingleCLF(clone(sgd_clf_sl.classifier),'sgd_clfCROSS_sl',train_data,train_target,test_data,test_target)
+sgd_clfCROSS_sl.set_pred = cross_val_predict(sgd_clfCROSS_sl.classifier,sgd_clfCROSS_sl.test_data,sgd_clfCROSS_sl.test_target,cv=3)
+comparer.insert_clf(sgd_clfCROSS_sl)
+sgd_clfSTRAT_sl = SingleCLF(clone(sgd_clf_sl.classifier),'sgd_clfSTRAT_sl',train_data,train_target,test_data,test_target)
+
+#lepiej juz dzialac z tym co masz ponizej :) 
+
+comparer.insert_clf(SingleCLF(SGDClassifier(max_iter=1000,tol=1e-3,random_state=42),'sgd_clf_sl',train_data,train_target,test_data,test_target))
+comparer.insert_clf(SingleCLF(RandomForestClassifier(n_estimators=100,random_state=42),'rfor_clf_sl',train_data,train_target,test_data,test_target))
+
+comparer.compare_clfs()
+
+
 # uczymy sie.
-if('sgd_clf' not in globals() or FORCE_CALC):
+if('test_pred6_sgd' not in globals() or FORCE_CALC):
+    
     sgd_clf = SGDClassifier(max_iter=1000,tol=1e-3,random_state=42)
     sgd_clf.fit(X=train_data,y=train_target6)
-if('test_pred6' not in globals() or FORCE_CALC):
-    test_pred6=sgd_clf.predict(test_data)
+    test_pred6_sgd=sgd_clf.predict(test_data)
 if('test_pred6_strats' not in globals() or FORCE_CALC):
     test_pred6_strats,test_target6_strats  = get_strat_predict(model=clone(sgd_clf),splits=3,inputs=test_data,outputs=test_target6)   #based on StratifiedFold
 if('test_pred6_cross' not in globals() or FORCE_CALC):
@@ -120,50 +174,56 @@ if('test_pred6_rfor' not in globals() or FORCE_CALC):
     rfor_clf = RandomForestClassifier(n_estimators=100,random_state=42)
     rfor_clf.fit(train_data,train_target6)
     test_pred6_rfor= rfor_clf.predict(test_data)
-
-
     #ciekawe: uzyskujemy gorsze wyniki, poniewaz tu pracujemy z mniejszymi zbiorami.
 
 
-# TODO: moze jakas funkcja/klasa raportujaca? moze w set_workspace
-#porownujemy winiki
-corrects=round(sum(test_pred6==test_target6)/len(test_target6),4)
-corrects_strat=[round(sum(x==y)/len(y),4) for x,y in zip(test_pred6_strats,test_target6_strats)]
-corrects_cross=round(sum(test_pred6_cross==test_target6)/len(test_target6),4)
-corrects_rfor= round(sum(test_target6==test_pred6_rfor)/len(test_target6),4)
-cm_norm=confusion_matrix(test_target6,test_pred6).reshape(1,4)
-cm_cross=confusion_matrix(test_target6,test_pred6_cross).reshape(1,4)
-cm_strat=confusion_matrix(test_target6_strats[np.argmax(corrects_strat)],test_pred6_strats[np.argmax(corrects_strat)]).reshape(1,4)
-cm_rfor=confusion_matrix(test_target6,test_pred6_rfor).reshape(1,4)
-ps_norm=round(precision_score(test_target6,test_pred6),4)
-ps_cross=round(precision_score(test_target6,test_pred6_cross),4)
-ps_strat=round(precision_score(test_target6_strats[np.argmax(corrects_strat)],test_pred6_strats[np.argmax(corrects_strat)]),4)
-ps_rfor=round(precision_score(test_target6,test_pred6_rfor),4)
-rs_norm=round(recall_score(test_target6,test_pred6),4)
-rs_cross=round(recall_score(test_target6,test_pred6_cross),4)
-rs_strat=round(recall_score(test_target6_strats[np.argmax(corrects_strat)],test_pred6_strats[np.argmax(corrects_strat)]),4)
-rs_rfor=round(recall_score(test_target6,test_pred6_rfor),4)
-f1_norm=round(f1_score(test_target6,test_pred6),4)
-f1_cross=round(f1_score(test_target6,test_pred6_cross),4)
-f1_strat=round(f1_score(test_target6_strats[np.argmax(corrects_strat)],test_pred6_strats[np.argmax(corrects_strat)]),4)
-f1_rfor=round(f1_score(test_target6,test_pred6_rfor),4)
 
-print('CORRECTS[%]:','\n\tnorm:\t',corrects,'\n\tcross:\t', corrects_cross,'\n\tstrat:\t', max(corrects_strat),'\n\trfor:\t',corrects_rfor)
-print('CONFUSION MATRIX [TN(=wylapane zle), FP(=brudy), FN(=stracone), TP(=zlapane dobre)]:' , '\n\tnorm:\t',cm_norm,'\n\tcross:\t',cm_cross,'\n\tstrat:\t',cm_strat,'\n\trfor:\t',cm_rfor)
-print('PRECISION: tp / (tp + fp)','\n\tnorm:\t',ps_norm,'\n\tcross:\t',ps_cross,'\n\tstart:\t',ps_strat,'\n\trfor:\t',ps_rfor)
-print('RECALL: tp / (tp + fn)','\n\tnorm:\t',rs_norm,'\n\tcross:\t',rs_cross,'\n\tstart:\t',rs_strat,'\n\trfor:\t',rs_rfor)
-print('F1 SCORE (F1 = 2 * (precision * recall) / (precision + recall) ):','\n\tnorm:\t',f1_norm,'\n\tcross:\t',f1_cross,'\n\tstart:\t',f1_strat,'\n\trfor:\t',f1_rfor)
 
-#funckje i krzywe decyzyjne
-# TODO: Warto dodac jeszcze cos 
-if('wtarget6_pred_cross_score' not in globals() or True):
-    test_target6_pred_score=[round(sgd_clf.decision_function(x.reshape(1,-1))[0],2) for x in test_data[:20]]
-    test_target6_pred_cross_score= cross_val_predict(sgd_clf,test_data,test_target6,cv=3,method='decision_function')
-    # np.array(test_target6_pred_score) 
-print('DECISIONS (norm vs cross): ',test_target6_pred_score[:10],test_target6_pred_cross_score[0:10])
-# TODO: dodac porownanie krzywych z roznych modeli
-show_prt_curve(test_target6_pred_cross_score,test_target6,0.8)
-# TODO: show_roc_curve(targets,scores):
+
+
+
+# # TODO: moze jakas funkcja/klasa raportujaca? moze w set_workspace
+# #porownujemy winiki
+# corrects=round(sum(test_pred6_sgd==test_target6)/len(test_target6),4)
+# corrects_strat=[round(sum(x==y)/len(y),4) for x,y in zip(test_pred6_strats,test_target6_strats)]
+# corrects_cross=round(sum(test_pred6_cross==test_target6)/len(test_target6),4)
+# corrects_rfor= round(sum(test_target6==test_pred6_rfor)/len(test_target6),4)
+# cm_norm=confusion_matrix(test_target6,test_pred6_sgd).reshape(1,4)
+# cm_cross=confusion_matrix(test_target6,test_pred6_cross).reshape(1,4)
+# cm_strat=confusion_matrix(test_target6_strats[np.argmax(corrects_strat)],test_pred6_strats[np.argmax(corrects_strat)]).reshape(1,4)
+# cm_rfor=confusion_matrix(test_target6,test_pred6_rfor).reshape(1,4)
+# ps_norm=round(precision_score(test_target6,test_pred6_sgd),4)
+# ps_cross=round(precision_score(test_target6,test_pred6_cross),4)
+# ps_strat=round(precision_score(test_target6_strats[np.argmax(corrects_strat)],test_pred6_strats[np.argmax(corrects_strat)]),4)
+# ps_rfor=round(precision_score(test_target6,test_pred6_rfor),4)
+# rs_norm=round(recall_score(test_target6,test_pred6_sgd),4)
+# rs_cross=round(recall_score(test_target6,test_pred6_cross),4)
+# rs_strat=round(recall_score(test_target6_strats[np.argmax(corrects_strat)],test_pred6_strats[np.argmax(corrects_strat)]),4)
+# rs_rfor=round(recall_score(test_target6,test_pred6_rfor),4)
+# f1_norm=round(f1_score(test_target6,test_pred6_sgd),4)
+# f1_cross=round(f1_score(test_target6,test_pred6_cross),4)
+# f1_strat=round(f1_score(test_target6_strats[np.argmax(corrects_strat)],test_pred6_strats[np.argmax(corrects_strat)]),4)
+# f1_rfor=round(f1_score(test_target6,test_pred6_rfor),4)
+
+# print('CORRECTS[%]:','\n\tnorm:\t',corrects,'\n\tcross:\t', corrects_cross,'\n\tstrat:\t', max(corrects_strat),'\n\trfor:\t',corrects_rfor)
+# print('CONFUSION MATRIX [TN(=wylapane zle), FP(=brudy), FN(=stracone), TP(=zlapane dobre)]:' , '\n\tnorm:\t',cm_norm,'\n\tcross:\t',cm_cross,'\n\tstrat:\t',cm_strat,'\n\trfor:\t',cm_rfor)
+# print('PRECISION: tp / (tp + fp)','\n\tnorm:\t',ps_norm,'\n\tcross:\t',ps_cross,'\n\tstart:\t',ps_strat,'\n\trfor:\t',ps_rfor)
+# print('RECALL: tp / (tp + fn)','\n\tnorm:\t',rs_norm,'\n\tcross:\t',rs_cross,'\n\tstart:\t',rs_strat,'\n\trfor:\t',rs_rfor)
+# print('F1 SCORE (F1 = 2 * (precision * recall) / (precision + recall) ):','\n\tnorm:\t',f1_norm,'\n\tcross:\t',f1_cross,'\n\tstart:\t',f1_strat,'\n\trfor:\t',f1_rfor)
+
+# - wyliczanie % dobrych
+# - wyliczanie
+
+# #funckje i krzywe decyzyjne
+# # TODO: Warto dodac jeszcze cos 
+# if('wtarget6_pred_cross_score' not in globals() or True):
+#     test_target6_pred_score=[round(sgd_clf.decision_function(x.reshape(1,-1))[0],2) for x in test_data[:20]]
+#     test_target6_pred_cross_score= cross_val_predict(sgd_clf,test_data,test_target6,cv=3,method='decision_function')
+#     # np.array(test_target6_pred_score) 
+# print('DECISIONS (norm vs cross): ',test_target6_pred_score[:10],test_target6_pred_cross_score[0:10])
+# # TODO: dodac porownanie krzywych z roznych modeli
+# show_prt_curve(test_target6_pred_cross_score,test_target6,0.8)
+# # TODO: show_roc_curve(targets,scores):
 
 
 
