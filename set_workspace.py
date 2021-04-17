@@ -24,7 +24,7 @@ mpl.rc('ytick', labelsize=12)
 
 # Ścieżka zapisywania rysunków
 PROJECT_ROOT_DIR = "."
-CHAPTER_ID = "R03"
+CHAPTER_ID = "R04"
 IMAGES_PATH = os.path.join(PROJECT_ROOT_DIR, "rysunki", CHAPTER_ID)
 os.makedirs(IMAGES_PATH, exist_ok=True)
 
@@ -34,4 +34,3 @@ def save_fig(fig_id, tight_layout=True, fig_extension="png", resolution=300):
     if tight_layout:
         plt.tight_layout()
     plt.savefig(path, format=fig_extension, dpi=resolution)
-
