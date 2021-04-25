@@ -1,3 +1,4 @@
 {
-    "python.pythonPath": "C:\\Users\\dj6dvj\\Anaconda3\\envs\\tf2\\python.exe"
+    "python.pythonPath": "C:\\Users\\dj6dvj\\Anaconda3\\envs\\tf2\\python.exe",
+    "jupyter.textOutputLimit": 0
 }
