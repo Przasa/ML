@@ -20,8 +20,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
 import scipy.linalg
+from sklearn.preprocessing import PolynomialFeatures
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import train_test_split
+
 
 #%% funckje
+FIGURE=1
+
 def createRandomLinear(length):
     X = 2 * np.random.rand(length, 1)        # nie myl X z calym zestawem cech X_vec. X to tylko jedna cecha (tj X0=1, X1=X) 
     y = 15 + 3 * X + np.random.randn(length, 1) #randn to szum gausowski
@@ -122,6 +130,7 @@ def batchGradientDescent(X,y):
 # -> trzeba od razu wszystkie dane, ale niezly dla wielu cech (liczy je jednoczesnie)
 #jednak wartosci oscyluja. ale musisz uwazasz zeby uklad byl wciaz stabilny :)
 #to oznacza ze wektor gradientow przyjmuje tez wartosci ujemne (gdy przestrzelamy)
+    global FIGURE
     eta=0.007
     n_iterations=1000
     m= len(X)               #100
@@ -142,19 +151,20 @@ def batchGradientDescent(X,y):
         if np.abs(gradients[0])< 0.001 and np.abs(gradients[1]) < 0.001:
             break
 
-    plt.figure(1)
+    plt.figure(FIGURE); FIGURE+=1
     plt.plot(tarr[:,0],tarr[:,1],'b')
     plt.xlabel('$x_0$')
     plt.ylabel("$x_1$")
     plt.grid(True)
 
-    plt.figure(2)
+    plt.figure(FIGURE) ; FIGURE+=1
     plt.plot(garr[:,0],garr[:,1],'b')
     plt.xlabel("gradient($x_0$)")
     plt.ylabel("graident($x_1$)")
     plt.grid(True)
     
 def stochastidGradientDescent(X,y):
+    global FIGURE
     X_vec=np.c_[np.ones((len(X),1)),X]
     eta=0.007
     n_epochs=50
@@ -183,14 +193,14 @@ def stochastidGradientDescent(X,y):
     tarr=np.asarray(tlist)
 
 
-    plt.figure(3)
+    plt.figure(FIGURE);FIGURE+=1 
     plt.plot(tarr[:,0],tarr[:,1],'b')
     plt.xlabel('$x_0$')
     plt.ylabel("$x_1$")
     plt.grid(True)
     plt.show()
 
-    plt.figure(4)
+    plt.figure(FIGURE);FIGURE+=1
     plt.plot(garr[:,0],garr[:,1],'b')
     plt.xlabel("gradient($x_0$)")
     plt.ylabel("graident($x_1$)")
@@ -200,6 +210,7 @@ def stochastidGradientDescent(X,y):
 print("code prepared")
 
 def minibatchGradientDescent(X,y):
+    global FIGURE
     theta_path_mgd = []
     grad_path_mgd = []
 
@@ -233,21 +244,21 @@ def minibatchGradientDescent(X,y):
     theta_path_mgd = np.asarray(theta_path_mgd)
     grad_path_mgd = np.asarray(grad_path_mgd)
 
-    plt.figure(5)
+    plt.figure(FIGURE); FIGURE+=1
     plt.plot(theta_path_mgd[:,0],theta_path_mgd[:,1],'b')
     plt.xlabel('$x_0$')
     plt.ylabel("$x_1$")
     plt.grid(True)
     plt.show()
 
-    plt.figure(6)
+    plt.figure(FIGURE); FIGURE+=1
     plt.plot(grad_path_mgd[:,0],grad_path_mgd[:,1],'b')
     plt.xlabel("gradient($x_0$)")
     plt.ylabel("graident($x_1$)")
     plt.grid(True)
 
 def basic_poly_reg(X,y):
-
+    global FIGURE
     poly = PolynomialFeatures(degree=2,include_bias=False)
     X_poly=poly.fit_transform(X)        # nie musielismy wrzucac X0 = 1
     lin_reg = LinearRegression()
@@ -265,7 +276,7 @@ def basic_poly_reg(X,y):
     Xs_poly = poly.transform(Xs)
     ysp = lin_reg.predict(Xs_poly)
 
-    plt.figure(7)
+    plt.figure(FIGURE); FIGURE+=1
     plt.plot(X, y, "r.",label='samples')
     plt.plot(X, yp, "b.",label='predictions (by theta)')
     plt.plot(Xs, ysp, "g",label='predictions (by predict())')
@@ -277,7 +288,7 @@ def basic_poly_reg(X,y):
     # save_fig("r_4_12")
     plt.show()
 
-    plt.figure(8)
+    plt.figure(FIGURE); FIGURE+=1
     swd_conf = (("g-", 1, 300), ("b--", 2, 2), ("r-+", 2, 1),("black",2,5))   #style width degree
     for style, width, degree in swd_conf:
         polybig_features = PolynomialFeatures(degree=degree, include_bias=False)
@@ -301,6 +312,46 @@ def basic_poly_reg(X,y):
     # save_fig("r_4_14")
     plt.show()
 
+def learning_curves(X,y):
+
+    def plot_learning_curves(model, X, y,header):
+        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=10)
+        train_errors, val_errors = [], []
+        for m in range(1, len(X_train)):        #zmienia sie dlugosc zbiory uczacego, ale walidacyjne nie (walidacyjny jest natomiast zalezny od modelu trenowanego na zbierze uczacego)
+            model.fit(X_train[:m], y_train[:m])
+            y_train_predict = model.predict(X_train[:m])    # zmianie sie dlugosc przewidywanego zbioru uczecego
+            y_val_predict = model.predict(X_val)            # a tu dlugosc sie nie zmienia
+            train_errors.append(mean_squared_error(y_train[:m], y_train_predict))
+            val_errors.append(mean_squared_error(y_val, y_val_predict))
+
+        global FIGURE
+        plt.figure(FIGURE); FIGURE+=1
+        plt.title('Krzywe Bledu ('+header+')')
+        plt.plot(np.sqrt(train_errors), "r-+", linewidth=2, label="Zestaw uczący")
+        plt.plot(np.sqrt(val_errors), "b-", linewidth=3, label="Zestaw walidacyjny")
+        plt.legend(loc="upper right", fontsize=14)          # nieukazane w książce
+        plt.xlabel("Rozmiar zestawu uczącego", fontsize=14) # nieukazane
+        plt.ylabel("Błąd RMSE", fontsize=14)                # nieukazane
+        plt.text(20,train_errors[-1]+0.5,('RMSE_train='+str(train_errors[-1])+'\nRMSE_val='+str(val_errors[-1])),bbox={'facecolor': 'white', 'alpha': 0.5, 'pad': 5},fontsize='large')
+        plt.grid(True)
+        
+
+    linear_model= LinearRegression()
+    polynomial_model_2 = Pipeline([
+        # ('Standard Scaler',StandardScaler()),
+        ('Polynomialer', PolynomialFeatures(degree=2,include_bias=False)),
+        ("Linear Regression",LinearRegression())
+    ])
+    polynomial_model_10 = Pipeline([
+        # ('Standard Scaler',StandardScaler()),
+        ('Polynomialer', PolynomialFeatures(degree=10,include_bias=False)),
+        ("Linear Regression",LinearRegression())
+    ])
+
+    plot_learning_curves(linear_model,X,y,header='linear')
+    plot_learning_curves(polynomial_model_2,X,y,header='polynomial (2)')
+    plot_learning_curves(polynomial_model_10,X,y,header='polynomial (10)')
+
 
 # %%
 samples_qty=100
@@ -310,61 +361,24 @@ if('X' not in globals() or 'y' not in globals() or FORCE_CALC):
     Xs=np.c_[np.asarray(range(0,20+1,1))/10]
 
 
-# TODO: troche otworz ta funkcje
+# TODO: troche otworz ta funkcje (przerost formy nad trescia)
 # closedForms(X,y)
-
-#TODO: zrobi jakies porownanie szybkosci tych gradientow
+#TODO: mozne wrzucic jeszcze uczenie przez  SGD Regressor (tzn z funckji SGDRegressor, a nie z reki)
+#TODO: te wykresy mozna naprawci troche
+#TODO: zrobi jakies porownanie szybkosci tych gradientow (przy tych samych wejsciach)
 # batchGradientDescent(X,y)
 # stochastidGradientDescent(X,y)
 # minibatchGradientDescent(X,y)
-#TODO: mozne wrzucic jeszcze uczenie przez  SGD Regressor
 
-
-del(X)
-del(y)
-
-
-
-#%% Polynomial regression
-# TODO, przerzucic to na sam szczyt
-from sklearn.preprocessing import PolynomialFeatures
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
-from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import train_test_split
-
-
+del(X);del(y)
 if('X' not in globals() or 'y' not in globals() or FORCE_CALC):
     n_samples =100
     X = 6 * np.random.rand(n_samples,1)-3
     y= 0.5 * X**2  +2 + np.random.randn(n_samples,1)
 
-basic_poly_reg(X,y)
+# basic_poly_reg(X,y)
+# learning_curves(X,y)
 
-# def error_compare(X,y):
-X_train, X_val, y_train , y_val = train_test_split(X,y,testsize=0.2,random_state=42)
-poly = PolynomialFeatures(degre=2)
-
-
-from sklearn.metrics import mean_squared_error
-from sklearn.model_selection import train_test_split
-
-#do przerobienia jescze
-def plot_learning_curves(model, X, y):
-    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=10)
-    train_errors, val_errors = [], []
-    for m in range(1, len(X_train)):
-        model.fit(X_train[:m], y_train[:m])
-        y_train_predict = model.predict(X_train[:m])
-        y_val_predict = model.predict(X_val)
-        train_errors.append(mean_squared_error(y_train[:m], y_train_predict))
-        val_errors.append(mean_squared_error(y_val, y_val_predict))
-
-    plt.plot(np.sqrt(train_errors), "r-+", linewidth=2, label="Zestaw uczący")
-    plt.plot(np.sqrt(val_errors), "b-", linewidth=3, label="Zestaw walidacyjny")
-    plt.legend(loc="upper right", fontsize=14)          # nieukazane w książce
-    plt.xlabel("Rozmiar zestawu uczącego", fontsize=14) # nieukazane
-    plt.ylabel("Błąd RMSE", fontsize=14)                # nieukazane
+#%% Regularyzowane modele
 
 
-# %%
