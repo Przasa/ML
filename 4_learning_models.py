@@ -246,6 +246,60 @@ def minibatchGradientDescent(X,y):
     plt.ylabel("graident($x_1$)")
     plt.grid(True)
 
+def basic_poly_reg(X,y):
+
+    poly = PolynomialFeatures(degree=2,include_bias=False)
+    X_poly=poly.fit_transform(X)        # nie musielismy wrzucac X0 = 1
+    lin_reg = LinearRegression()
+    lin_reg.fit(X_poly,y)
+
+    #liczenia reczne z theta
+    theta = [x for x  in lin_reg.coef_[0]]
+    theta.insert(0,lin_reg.intercept_)
+    X_poly_vec = np.c_[np.ones((len(X),1)),X_poly]
+    yp=X_poly_vec.dot(theta)
+    yp.resize((len(yp),1))
+
+    #liczenie automatyczne z funkcji predict
+    Xs=np.linspace(-3, 3, 100).reshape(100, 1)
+    Xs_poly = poly.transform(Xs)
+    ysp = lin_reg.predict(Xs_poly)
+
+    plt.figure(7)
+    plt.plot(X, y, "r.",label='samples')
+    plt.plot(X, yp, "b.",label='predictions (by theta)')
+    plt.plot(Xs, ysp, "g",label='predictions (by predict())')
+    plt.xlabel("$x_1$", fontsize=18)
+    plt.ylabel("$y$", rotation=0, fontsize=18)
+    plt.axis([-3, 3, 0, 10])
+    plt.legend()
+    plt.title("Polynomials and LinearRegression")
+    # save_fig("r_4_12")
+    plt.show()
+
+    plt.figure(8)
+    swd_conf = (("g-", 1, 300), ("b--", 2, 2), ("r-+", 2, 1),("black",2,5))   #style width degree
+    for style, width, degree in swd_conf:
+        polybig_features = PolynomialFeatures(degree=degree, include_bias=False)
+        std_scaler = StandardScaler()
+        lin_reg = LinearRegression()
+        polynomial_regression = Pipeline([
+                ("poly_features", polybig_features),
+                ("std_scaler", std_scaler),
+                ("lin_reg", lin_reg),
+            ])
+        polynomial_regression.fit(X, y)
+        ysp_multi = polynomial_regression.predict(Xs)
+        plt.plot(Xs, ysp_multi, style, label=str(degree), linewidth=width)
+
+    plt.plot(X, y, "b.", linewidth=3)
+    plt.legend(loc="upper left")
+    plt.xlabel("$x_1$", fontsize=18)
+    plt.ylabel("$y$", rotation=0, fontsize=18)
+    plt.title("Polynomials comparision\nCalculated by predict()")
+    plt.axis([-3, 3, 0, 10])
+    # save_fig("r_4_14")
+    plt.show()
 
 
 # %%
@@ -265,44 +319,52 @@ if('X' not in globals() or 'y' not in globals() or FORCE_CALC):
 # minibatchGradientDescent(X,y)
 #TODO: mozne wrzucic jeszcze uczenie przez  SGD Regressor
 
+
 del(X)
 del(y)
 
 
 
-
 #%% Polynomial regression
+# TODO, przerzucic to na sam szczyt
 from sklearn.preprocessing import PolynomialFeatures
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import train_test_split
+
 
 if('X' not in globals() or 'y' not in globals() or FORCE_CALC):
     n_samples =100
     X = 6 * np.random.rand(n_samples,1)-3
     y= 0.5 * X**2  +2 + np.random.randn(n_samples,1)
 
+basic_poly_reg(X,y)
 
-poly = PolynomialFeatures(degree=2,include_bias=False)
-X_poly=poly.fit_transform(X)        # nie musielismy wrzucac X0 = 1
-lin_reg = LinearRegression()
-lin_reg.fit(X_poly,y)
+# def error_compare(X,y):
+X_train, X_val, y_train , y_val = train_test_split(X,y,testsize=0.2,random_state=42)
+poly = PolynomialFeatures(degre=2)
 
-theta = [x for x  in lin_reg.coef_[0]]
-theta.insert(0,lin_reg.intercept_)
-X_poly_voc = np.c_[np.ones((len(X),1)),X_poly]
-yp=X_poly_voc.dot(theta)
-yp.resize((len(yp),1))
 
-plt.figure(7)
-plt.plot(X, y, "r.")
-plt.plot(X, yp, "b.")
-plt.xlabel("$x_1$", fontsize=18)
-plt.ylabel("$y$", rotation=0, fontsize=18)
-plt.axis([-3, 3, 0, 10])
-plt.title("Polynomial regression")
-# save_fig("r_4_12")
-plt.show()
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import train_test_split
 
-#razczej tak rob
-# X_new=np.linspace(-3, 3, 100).reshape(100, 1)
-# X_new_poly = poly_features.transform(X_new)
-# y_new = lin_reg.predict(X_new_poly)
+#do przerobienia jescze
+def plot_learning_curves(model, X, y):
+    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=10)
+    train_errors, val_errors = [], []
+    for m in range(1, len(X_train)):
+        model.fit(X_train[:m], y_train[:m])
+        y_train_predict = model.predict(X_train[:m])
+        y_val_predict = model.predict(X_val)
+        train_errors.append(mean_squared_error(y_train[:m], y_train_predict))
+        val_errors.append(mean_squared_error(y_val, y_val_predict))
 
+    plt.plot(np.sqrt(train_errors), "r-+", linewidth=2, label="Zestaw uczący")
+    plt.plot(np.sqrt(val_errors), "b-", linewidth=3, label="Zestaw walidacyjny")
+    plt.legend(loc="upper right", fontsize=14)          # nieukazane w książce
+    plt.xlabel("Rozmiar zestawu uczącego", fontsize=14) # nieukazane
+    plt.ylabel("Błąd RMSE", fontsize=14)                # nieukazane
+
+
+# %%
