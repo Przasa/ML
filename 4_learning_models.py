@@ -378,7 +378,67 @@ if('X' not in globals() or 'y' not in globals() or FORCE_CALC):
 
 # basic_poly_reg(X,y)
 # learning_curves(X,y)
+del(X); del(y)
 
 #%% Regularyzowane modele
+# del(X); del(y)
+from sklearn.linear_model import Ridge
+samples_qty=100
+if ('X' not in globals() or 'y' not in globals()):
+    X= 6*np.random.rand(samples_qty,1) -3
+    y= -5 + 1.5*X + np.random.randn(samples_qty,1)
+    Xs = np.c_[range(-30,30+1,1)]; Xs=Xs/10
 
 
+
+ridge_model = Ridge(alpha=1,solver='cholesky',random_state=42)
+ridge_model.fit(X,y)
+yp=ridge_model.predict(Xs)
+ridge_model = Ridge(alpha=1,solver='sag',random_state=42,tol=1e-3)
+ridge_model.fit(X,y)
+yp2=ridge_model.predict(Xs)
+
+# fig,ax = plt.subplot(2,1)
+#porownanie roznych metod
+global FIGURE
+plt.figure(FIGURE); FIGURE+=1
+plt.title('Predykcja z Ridge (linear least squeares with L2 regulation)')
+plt.plot(X,y,'b.',label='samples')
+plt.plot(Xs,yp,'g',label='ridge (chlesky)(=closed form)')
+plt.plot(Xs,yp2,'r',label='ridge (sag)')
+plt.legend(loc='upper left')
+plt.grid(True)
+
+#porownanie dla roznych alpha
+plt.figure(FIGURE); FIGURE+=1
+plt.title('Predykcja z Ridge (lsqr)\n(porownanie a dla linear)')
+plt.plot(X,y,'b.',label='samples')
+for alpha in [0.1,0.2,0.5,0.9,1]:
+    ridge_model = Ridge(alpha=alpha,solver='lsqr',random_state=42)
+    ridge_model.fit(X,y)
+    yp=ridge_model.predict(Xs)
+    plt.plot(Xs,yp,label='alpha='+str(alpha))
+plt.grid(True)
+plt.legend()
+
+
+plt.figure(FIGURE); FIGURE+=1
+plt.title('Predykcja z Ridge (lsqr)\n(porownanie a dla polynomials)')
+plt.plot(X,y,'b.',label='samples')
+for alpha in [0.1,0.2,0.5,0.9,1]:
+    pipeline = Pipeline([
+        ('Polynomial',PolynomialFeatures(degree=10,include_bias=False)),
+        ('Scaler',StandardScaler()),
+        ('Ridge',Ridge(alpha=alpha,random_state=42))
+    ])
+    pipeline.fit(X,y)
+    yp=pipeline.predict(Xs)
+    plt.plot(Xs,yp,label='alpha='+str(alpha))
+plt.grid(True)
+plt.axis([0,2,-5,-2])       # TODO: wyrkres bez zooma
+plt.legend()
+
+
+
+
+# %%
