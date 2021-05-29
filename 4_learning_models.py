@@ -15,16 +15,24 @@
 
 FORCE_CALC=False
 
+from os import pipe
+from numpy.linalg.linalg import cholesky
+from sklearn.utils.extmath import randomized_range_finder
 import set_workspace as wspace
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
+from sklearn.base import clone
 import scipy.linalg
 from sklearn.preprocessing import PolynomialFeatures
 from sklearn.preprocessing import StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.metrics import mean_squared_error
 from sklearn.model_selection import train_test_split
+from sklearn.linear_model import Ridge
+from sklearn.linear_model import SGDRegressor
+from sklearn.linear_model import Lasso
+from sklearn.linear_model import ElasticNet
 
 
 #%% funckje
@@ -354,6 +362,179 @@ def learning_curves(X,y):
     plot_learning_curves(polynomial_model_10,X,y,header='polynomial (10)')
 
 
+def regulatedModels(X,Xs,X_poly,Xs_poly,y):
+    global FIGURE
+    # ‘auto’ chooses the solver automatically based on the type of data.
+    # ‘svd’ uses a Singular Value Decomposition of X to compute the Ridge coefficients. More stable for singular matrices than ‘cholesky’.
+    # ‘cholesky’ uses the standard scipy.linalg.solve function to obtain a closed-form solution.
+    # ‘sparse_cg’ uses the conjugate gradient solver as found in scipy.sparse.linalg.cg. As an iterative algorithm, this solver is more appropriate than ‘cholesky’ for large-scale data (possibility to set tol and max_iter).
+    # ‘lsqr’ uses the dedicated regularized least-squares routine scipy.sparse.linalg.lsqr. It is the fastest and uses an iterative procedure.
+    # ‘sag’ uses a Stochastic Average Gradient descent, and ‘saga’ uses its improved, unbiased version named SAGA. Both methods also use an iterative procedure, and are often faster than other solvers when both n_samples and n_features are large. Note that ‘sag’ and ‘saga’ fast convergence is only guaranteed on features with approximately the same scale. You can preprocess the data with a scaler from sklearn.preprocessing.
+    solvers = ['auto','svd','cholesky','sparse_cg','lsqr','sag']
+    colors = ['green','red','black','orange','grey','pink']
+    alphas=[1e-5,0.1,0.5,0.9,1]
+
+
+    fig,(ax1,ax2)= plt.subplots(1,2)
+    fig.suptitle('porownanie roznych modeli z kara L2 (Ridge)')
+    fig.set_size_inches(12, 6)
+    fig.number=FIGURE; FIGURE+=1
+
+    #porownanie dla modeli linionwych
+    ax1.set_title('Predykcja dla linear')
+    ax1.plot(X,y,'b.',label='samples')
+    for slv,clr in zip(solvers,colors):
+        model = Ridge(alpha=1,solver=slv,random_state=42,tol=1e-3)
+        model.fit(X,y)
+        predictions = model.predict(Xs)
+        ax1.plot(Xs,predictions,clr,label=slv)
+    sgd_model = SGDRegressor(penalty='l2')
+    sgd_model.fit(X,y)
+    ax1.plot(Xs,sgd_model.predict(Xs),'magenta',label='SGD_reg')
+    ax1.legend(loc='upper left')
+    ax1.grid(True)
+
+    # porownanie dla modeli wielomianowych
+    ax2.set_title('Predykcja dla polynomial')
+    ax2.plot(X,y,'b.',label='samples')
+    for slv,clr in zip(solvers,colors):
+        model = Ridge(alpha=1,solver=slv,random_state=42,tol=1e-3)
+        model.fit(X_poly,y)
+        predictions = model.predict(Xs_poly)
+        ax2.plot(Xs,predictions,clr,label=slv)
+    sgd_model = SGDRegressor(penalty='l2')
+    sgd_model.fit(X_poly,y)
+    ax2.plot(Xs,sgd_model.predict(Xs_poly),'magenta',label='SGD_reg')
+    ax2.axis([0,3,0,4])
+    plt.legend()
+    ax2.grid(True)
+
+
+    #porownanie dla roznych kary alpha (modele liniowe)
+    fig,(ax1,ax2)= plt.subplots(1,2)
+    fig.suptitle('porownanie modelu z kara L2, dla roznych alpha')
+    fig.set_size_inches(12, 6)
+    fig.number=FIGURE; FIGURE+=1
+    ax1.set_title('Predykcja z Ridge (cholesky[=def])\n(porownanie a dla linear)')
+    ax1.plot(X,y,'b.',label='samples')
+    for alpha in alphas:
+        ridge_model = Ridge(alpha=alpha,solver='cholesky',random_state=42)
+        ridge_model.fit(X,y)
+        yp=ridge_model.predict(Xs)
+        ax1.plot(Xs,yp,label='alpha='+str(alpha))
+    ax1.grid(True)
+    ax1.axis([0.5,1.5,1,2])       # TODO: wyrkres bez zooma
+    ax1.legend()
+
+    #porownanie dla roznych alpha (modele wielomianowe)
+    ax2.set_title('Predykcja z Ridge (cholesky[=def=cl.form])\n(porownanie a dla polynomials)')
+    ax2.plot(X,y,'b.',label='samples')
+    for alpha in alphas:
+        pipeline = Pipeline([
+            ('Polynomial',PolynomialFeatures(degree=3,include_bias=False)),
+            ('Scaler',StandardScaler()),
+            ('Ridge',Ridge(alpha=alpha,solver='cholesky',random_state=42))
+        ])
+        pipeline.fit(X,y)
+        yp=pipeline.predict(Xs)
+        ax2.plot(Xs,yp,label='alpha='+str(alpha))
+    ax2.grid(True)
+    ax2.axis([0.5,1.5,1,2])       # TODO: wyrkres bez zooma
+    ax2.legend()
+
+    fig,(ax1,ax2)= plt.subplots(1,2)
+    fig.number=FIGURE; FIGURE+=1
+    fig.suptitle('porownanie modelu z kara L1 (Lasso), dla roznych alpha')
+    fig.set_size_inches(12, 6)
+
+    #lasso jest modelem liniowym. liczy wiec prawdopodobnie z closed form
+    ax1.set_title('model liniowy')
+    ax1.plot(X,y,'b.',label='samples')
+    for alpha in alphas:
+        lasso_model=Lasso(alpha=alpha)  
+        lasso_model.fit(X,y)
+        ypred=lasso_model.predict(Xs)
+        ax1.plot(Xs,ypred,label=alpha)
+    ax1.grid(True)
+    ax1.axis([1,2,1,2])
+    ax1.legend()
+
+    ax2.set_title('model wielomianowy')
+    ax2.plot(X,y,'b.',label='samples')
+    for alpha in alphas:
+        lasso_model=Lasso(alpha=alpha)  
+        lasso_model.fit(X_poly,y)
+        ypred=lasso_model.predict(Xs_poly)
+        ax2.plot(Xs,ypred,label=alpha)
+    ax2.grid(True)
+    ax2.axis([1,2,1,2])
+    ax2.legend()
+
+
+    fig,(ax1,ax2)= plt.subplots(1,2)
+    fig.number=FIGURE; FIGURE+=1
+    fig.suptitle('porownanie modelu z kara L1 i L2 (ElasticNet), dla roznych alpha')
+    fig.set_size_inches(12, 6)
+
+    #lasso jest modelem liniowym. liczy wiec prawdopodobnie z closed form
+    ax1.set_title('model liniowy')
+    ax1.plot(X,y,'b.',label='samples')
+    for alpha in alphas:
+        elnet_model=ElasticNet(alpha=alpha,l1_ratio=0.5, random_state=42)  
+        elnet_model.fit(X,y)
+        ypred=elnet_model.predict(Xs)
+        ax1.plot(Xs,ypred,label=alpha)
+    ax1.grid(True)
+    ax1.axis([1,2,1,2])
+    ax1.legend()
+
+    ax2.set_title('model wielomianowy')
+    ax2.plot(X,y,'b.',label='samples')
+    for alpha in alphas:
+        elnet_model=ElasticNet(alpha=alpha,l1_ratio=0.5, random_state=42)  
+        elnet_model.fit(X_poly,y)
+        ypred=elnet_model.predict(Xs_poly)
+        ax2.plot(Xs,ypred,label=alpha)
+    ax2.grid(True)
+    ax2.axis([1,2,1,2])
+    ax2.legend()
+
+def early_stopping(X,y):
+    global FIGURE
+    X_train, X_val, y_train, y_val = train_test_split(X[:50], y[:50].ravel(), test_size=0.5, random_state=10) #dlaczego tylko polowa?
+    pipeline = Pipeline([
+        ('poly_feature',PolynomialFeatures(degree=90,include_bias=False)), #90stopni!
+        ("standard_scaler",StandardScaler())
+    ])
+    X_train_poly = pipeline.fit_transform(X_train)
+    X_val_poly = pipeline.fit_transform(X_val)
+
+    sgd_model = SGDRegressor(max_iter=1,tol=-np.infty,warm_start=True,penalty=None, learning_rate ="constant",eta0=0.0005, random_state=42)
+
+    min_error = float("inf")
+    best_epoch =None
+    best_model = None
+    epoch_lst,error_lst = [],[]
+    for epoch in range(1000):
+        sgd_model.fit(X_train_poly,y_train)
+        ypred = sgd_model.predict(X_val_poly)
+        error = mean_squared_error(y_val,ypred)
+        epoch_lst.append(epoch)
+        error_lst.append(error)
+        if error< min_error:
+            best_epoch = epoch
+            best_model = clone(sgd_model)
+            min_error=error
+
+    plt.figure(FIGURE); FIGURE+-1
+    plt.title('early stopping (for SGDregressor)')
+    plt.plot(epoch_lst,error_lst,label='failures')
+    plt.plot([0,1000],[min_error,min_error],'b--',label='min error='+str(min_error))
+    # plt.text(10,10,('min_error='),bbox={'facecolor': 'white', 'alpha': 0.5, 'pad': 5},fontsize='large')
+    plt.axis([np.max([np.argmin(error_lst)-300,0]),np.min([1000,np.argmin(error_lst)+100]),0.9*min_error,1.1*min_error])
+    plt.legend()
+    plt.grid(True)
+
 # %%
 samples_qty=100
 #TODO zrob cos takiego dla wielu cech, nie tylko jednej z zerową
@@ -362,11 +543,11 @@ if('X' not in globals() or 'y' not in globals() or FORCE_CALC):
     Xs=np.c_[np.asarray(range(0,20+1,1))/10]
 
 
-# TODO: troche otworz ta funkcje (przerost formy nad trescia)
-# closedForms(X,y)
+#TODO: troche otworz closedForms (przerost formy nad trescia)
 #TODO: mozne wrzucic jeszcze uczenie przez  SGD Regressor (tzn z funckji SGDRegressor, a nie z reki)
 #TODO: te wykresy mozna naprawci troche
 #TODO: zrobi jakies porownanie szybkosci tych gradientow (przy tych samych wejsciach)
+# closedForms(X,y)
 # batchGradientDescent(X,y)
 # stochastidGradientDescent(X,y)
 # minibatchGradientDescent(X,y)
@@ -378,108 +559,147 @@ if('X' not in globals() or 'y' not in globals() or FORCE_CALC):
     y= 0.5 * X**2  +2 + np.random.randn(n_samples,1)
 
 # basic_poly_reg(X,y)
-# learning_curves(X,y)
-del(X); del(y)
 
-#%% Regularyzowane modele
-# del(X); del(y)
-from sklearn.linear_model import Ridge
-from sklearn.linear_model import SGDRegressor
-samples_qty=100
+# learning_curves(X,y)
+
+del(X); del(y)
 if ('X' not in globals() or 'y' not in globals()):
     X= 3*np.random.rand(samples_qty,1)
     y= 1 + 0.5*X + np.random.randn(samples_qty,1)
     Xs = np.c_[range(0,30+1,1)]; Xs=Xs/10
-global FIGURE
+
+    polfeat = PolynomialFeatures(degree=3,include_bias=False)
+    X_poly = polfeat.fit_transform(X)
+    Xs_poly = polfeat.fit_transform(Xs)
+
+# regulatedModels(X,Xs,X_poly,Xs_poly,y)
+
+#wczesne zatrzymywanie (to tez regulacja_).
+del(X); del(y)
+if ('X' not in globals() or 'y' not in globals()):
+    samples_qty = 100
+    np.random.seed(42)
+    X = 6 * np.random.rand(samples_qty, 1) - 3
+    y = 2 + X + 0.5 * X**2 + np.random.randn(samples_qty, 1)
+
+early_stopping(X,y)
+
+#graf 
+
+# %% regresja logistyczne
+#przyjzyj sie tym obliczeniom jeszcze
+
+from sklearn.linear_model import LogisticRegression
+
+if 'iris' not in globals():
+    from sklearn import datasets
+    iris = datasets.load_iris()
+    list(iris.keys())
 
 
-#porownanie dla linear
-ridge_model = Ridge(alpha=1,solver='cholesky',random_state=42)
-ridge_model.fit(X,y)
-yp=ridge_model.predict(Xs)
-ridge_model = Ridge(alpha=1,solver='sag',random_state=42,tol=1e-3)
-ridge_model.fit(X,y)
-yp2=ridge_model.predict(Xs)
-ridge_model = Ridge(alpha=1,solver='lsqr',random_state=42,tol=1e-3)
-ridge_model.fit(X,y)
-yp3=ridge_model.predict(Xs)
-sgd_model = SGDRegressor(penalty='l2')
-sgd_model.fit(X,y)
-yp4=sgd_model.predict(Xs)
+#licznie dla jednej cechy
+log_reg = LogisticRegression(solver="lbfgs", random_state=42)
+X=iris['data'][:,3:]      #dlugosc platka
+y=(iris['target']==2).astype(np.int)        #virgnica
+log_reg.fit(X,y)
+X_samples=np.linspace(0,3,1000).reshape(-1, 1)
+preds = log_reg.predict_proba(X_samples)        #oblicza tez przyporzadkowanie negatywne
+decision_boundary = X_samples[preds[:, 1] >= 0.5][0]
 
-
-plt.figure(FIGURE); FIGURE+=1
-plt.title('Predykcja dla linear')
-plt.plot(X,y,'b.',label='samples')
-plt.plot(Xs,yp,'g',label='ridge (cholesky)(=closed form)')
-plt.plot(Xs,yp2,'r',label='ridge (sag)')
-plt.plot(Xs,yp3,'black',label='ridge (lsqr)')
-plt.plot(Xs,yp4,'orange',label='SGDRegressor (lsqr)')
-plt.legend(loc='upper left')
-plt.grid(True)
-
-# porownanie dla polynomial
-polfeat = PolynomialFeatures(degree=3,include_bias=False)
-X_poly = polfeat.fit_transform(X)
-Xs_poly = polfeat.fit_transform(Xs)
-
-ridge_model = Ridge(alpha=1,solver='cholesky',random_state=42)
-ridge_model.fit(X_poly,y)
-yp=ridge_model.predict(Xs_poly)
-ridge_model = Ridge(alpha=1,solver='sag',random_state=42,tol=1e-3)
-ridge_model.fit(X_poly,y)
-yp2=ridge_model.predict(Xs_poly)
-ridge_model = Ridge(alpha=1,solver='lsqr',random_state=42,tol=1e-3)
-ridge_model.fit(X_poly,y)
-yp3=ridge_model.predict(Xs_poly)
-sgd_model = SGDRegressor(penalty='l2')
-sgd_model.fit(X_poly,y)
-yp4=sgd_model.predict(Xs_poly)
-
-plt.figure(FIGURE); FIGURE+=1
-plt.title('Predykcja dla polynomials\n')
-plt.plot(X,y,'b.',label='samples')
-plt.plot(Xs,yp,'g',label='ridge (cholesky)(=closed form)')
-plt.plot(Xs,yp2,'r',label='ridge (sag)')
-plt.plot(Xs,yp3,'black',label='ridge (lsqr)')
-plt.plot(Xs,yp4,'orange',label='SGDRegressor (lsqr)')
-plt.legend(loc='upper left')
-plt.grid(True)
-
-
-
-#porownanie dla roznych alpha (linear)
-plt.figure(FIGURE); FIGURE+=1
-plt.title('Predykcja z Ridge (cholesky[=def])\n(porownanie a dla linear)')
-plt.plot(X,y,'b.',label='samples')
-for alpha in [1e-5,0.1,0.5,0.9,1]:
-    ridge_model = Ridge(alpha=alpha,solver='cholesky',random_state=42)
-    ridge_model.fit(X,y)
-    yp=ridge_model.predict(Xs)
-    plt.plot(Xs,yp,label='alpha='+str(alpha))
-plt.grid(True)
+plt.plot(X_samples, preds[:, 1], "g-", linewidth=2, label="Iris virginica")
+plt.plot(X_samples, preds[:, 0], "b--", linewidth=2, label="Pozostałe")
+plt.xlabel("Szerokość płatka (cm)", fontsize=14)
+plt.ylabel("Prawdopodobieństwo", fontsize=14)
 plt.legend()
-
-#porownanie dla roznych alpha (polynomial)
-plt.figure(FIGURE); FIGURE+=1
-plt.title('Predykcja z Ridge (cholesky[=def])\n(porownanie a dla polynomials)')
-plt.plot(X,y,'b.',label='samples')
-for alpha in [1e-5,0.1,0.5,0.9,1]:
-    pipeline = Pipeline([
-        ('Polynomial',PolynomialFeatures(degree=3,include_bias=False)),
-        ('Scaler',StandardScaler()),
-        ('Ridge',Ridge(alpha=alpha,solver='cholesky',random_state=42))
-    ])
-    pipeline.fit(X,y)
-    yp=pipeline.predict(Xs)
-    plt.plot(Xs,yp,label='alpha='+str(alpha))
 plt.grid(True)
-plt.axis([0.5,1.5,1,2])       # TODO: wyrkres bez zooma
-plt.legend()
 
-print("ok")
 
-#teraz jeszcze Lasso 
+#liczenie dla 2 cech
+from sklearn.linear_model import LogisticRegression
 
-# %% Teraz Lasso, metoda elastycznej siatki
-# jakos wydziel funckej z tego wszytkiego
+X = iris["data"][:, (2, 3)]  # długość płatka, szerokość płatka
+y = (iris["target"] == 2).astype(np.int)
+
+log_reg = LogisticRegression(solver="lbfgs", C=10**10, random_state=42)
+log_reg.fit(X, y)
+
+x0, x1 = np.meshgrid(
+        np.linspace(2.9, 7, 500).reshape(-1, 1),
+        np.linspace(0.8, 2.7, 200).reshape(-1, 1),
+    )
+X_new = np.c_[x0.ravel(), x1.ravel()]
+
+y_proba = log_reg.predict_proba(X_new)
+
+plt.figure(figsize=(10, 4))
+plt.plot(X[y==0, 0], X[y==0, 1], "bs")
+plt.plot(X[y==1, 0], X[y==1, 1], "g^")
+
+zz = y_proba[:, 1].reshape(x0.shape)
+contour = plt.contour(x0, x1, zz, cmap=plt.cm.brg)
+
+
+left_right = np.array([2.9, 7])
+boundary = -(log_reg.coef_[0][0] * left_right + log_reg.intercept_[0]) / log_reg.coef_[0][1]
+
+plt.clabel(contour, inline=1, fontsize=12)
+plt.plot(left_right, boundary, "k--", linewidth=3)
+plt.text(3.5, 1.5, "Pozostałe", fontsize=14, color="b", ha="center")
+plt.text(6.5, 2.3, "Iris virginica", fontsize=14, color="g", ha="center")
+plt.xlabel("Długość płatka", fontsize=14)
+plt.ylabel("Szerokość płatka", fontsize=14)
+plt.axis([2.9, 7, 0.8, 2.7])
+# save_fig("r_4_24")
+plt.show()
+
+
+#softmax
+X = iris["data"][:, (2, 3)]  # długość płatka, szerokość płatka
+y = iris["target"]
+
+softmax_reg = LogisticRegression(multi_class="multinomial",solver="lbfgs", C=10, random_state=42)
+softmax_reg.fit(X, y)
+x0, x1 = np.meshgrid(
+        np.linspace(0, 8, 500).reshape(-1, 1),
+        np.linspace(0, 3.5, 200).reshape(-1, 1),
+    )
+X_new = np.c_[x0.ravel(), x1.ravel()]
+
+
+y_proba = softmax_reg.predict_proba(X_new)
+y_predict = softmax_reg.predict(X_new)
+
+zz1 = y_proba[:, 1].reshape(x0.shape)
+zz = y_predict.reshape(x0.shape)
+
+plt.figure(figsize=(10, 4))
+plt.plot(X[y==2, 0], X[y==2, 1], "g^", label="Iris virginica")
+plt.plot(X[y==1, 0], X[y==1, 1], "bs", label="Iris versicolor")
+plt.plot(X[y==0, 0], X[y==0, 1], "yo", label="Iris setosa")
+
+from matplotlib.colors import ListedColormap
+custom_cmap = ListedColormap(['#fafab0','#9898ff','#a0faa0'])
+
+plt.contourf(x0, x1, zz, cmap=custom_cmap)
+contour = plt.contour(x0, x1, zz1, cmap=plt.cm.brg)
+plt.clabel(contour, inline=1, fontsize=12)
+plt.xlabel("Długość płatka", fontsize=14)
+plt.ylabel("Szerokość płatka", fontsize=14)
+plt.legend(loc="center left", fontsize=14)
+plt.axis([0, 7, 0, 3.5])
+# save_fig("r_4_25")
+plt.show()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
