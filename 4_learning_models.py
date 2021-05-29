@@ -33,6 +33,7 @@ from sklearn.linear_model import Ridge
 from sklearn.linear_model import SGDRegressor
 from sklearn.linear_model import Lasso
 from sklearn.linear_model import ElasticNet
+from sklearn.linear_model import LogisticRegression
 
 
 #%% funckje
@@ -535,6 +536,102 @@ def early_stopping(X,y):
     plt.legend()
     plt.grid(True)
 
+
+def logisticRegression(iris):
+    #licznie dla jednej cechy
+    log_reg = LogisticRegression(solver="lbfgs", random_state=42)
+    X=iris['data'][:,3:]      #dlugosc platka
+    y=(iris['target']==2).astype(np.int)        #virgnica
+    log_reg.fit(X,y)
+    X_samples=np.linspace(0,3,1000).reshape(-1, 1)
+    preds = log_reg.predict_proba(X_samples)        #oblicza tez przyporzadkowanie negatywne
+    decision_boundary = X_samples[preds[:, 1] >= 0.5][0]
+
+    plt.plot(X_samples, preds[:, 1], "g-", linewidth=2, label="Iris virginica")
+    plt.plot(X_samples, preds[:, 0], "b--", linewidth=2, label="Pozostałe")
+    plt.xlabel("Szerokość płatka (cm)", fontsize=14)
+    plt.ylabel("Prawdopodobieństwo", fontsize=14)
+    plt.legend()
+    plt.grid(True)
+
+
+    #liczenie dla 2 cech
+    # from sklearn.linear_model import LogisticRegression
+
+    X = iris["data"][:, (2, 3)]  # długość płatka, szerokość płatka
+    y = (iris["target"] == 2).astype(np.int)
+
+    log_reg = LogisticRegression(solver="lbfgs", C=10**10, random_state=42)
+    log_reg.fit(X, y)
+
+    x0, x1 = np.meshgrid(
+            np.linspace(2.9, 7, 500).reshape(-1, 1),
+            np.linspace(0.8, 2.7, 200).reshape(-1, 1),
+        )
+    X_new = np.c_[x0.ravel(), x1.ravel()]
+
+    y_proba = log_reg.predict_proba(X_new)
+
+    plt.figure(figsize=(10, 4))
+    plt.plot(X[y==0, 0], X[y==0, 1], "bs")
+    plt.plot(X[y==1, 0], X[y==1, 1], "g^")
+
+    zz = y_proba[:, 1].reshape(x0.shape)
+    contour = plt.contour(x0, x1, zz, cmap=plt.cm.brg)
+
+
+    left_right = np.array([2.9, 7])
+    boundary = -(log_reg.coef_[0][0] * left_right + log_reg.intercept_[0]) / log_reg.coef_[0][1]
+
+    plt.clabel(contour, inline=1, fontsize=12)
+    plt.plot(left_right, boundary, "k--", linewidth=3)
+    plt.text(3.5, 1.5, "Pozostałe", fontsize=14, color="b", ha="center")
+    plt.text(6.5, 2.3, "Iris virginica", fontsize=14, color="g", ha="center")
+    plt.xlabel("Długość płatka", fontsize=14)
+    plt.ylabel("Szerokość płatka", fontsize=14)
+    plt.axis([2.9, 7, 0.8, 2.7])
+    # save_fig("r_4_24")
+    plt.show()
+
+
+    #softmax
+    X = iris["data"][:, (2, 3)]  # długość płatka, szerokość płatka
+    y = iris["target"]
+
+    softmax_reg = LogisticRegression(multi_class="multinomial",solver="lbfgs", C=10, random_state=42)
+    softmax_reg.fit(X, y)
+    x0, x1 = np.meshgrid(
+            np.linspace(0, 8, 500).reshape(-1, 1),
+            np.linspace(0, 3.5, 200).reshape(-1, 1),
+        )
+    X_new = np.c_[x0.ravel(), x1.ravel()]
+
+
+    y_proba = softmax_reg.predict_proba(X_new)
+    y_predict = softmax_reg.predict(X_new)
+
+    zz1 = y_proba[:, 1].reshape(x0.shape)
+    zz = y_predict.reshape(x0.shape)
+
+    plt.figure(figsize=(10, 4))
+    plt.plot(X[y==2, 0], X[y==2, 1], "g^", label="Iris virginica")
+    plt.plot(X[y==1, 0], X[y==1, 1], "bs", label="Iris versicolor")
+    plt.plot(X[y==0, 0], X[y==0, 1], "yo", label="Iris setosa")
+
+    from matplotlib.colors import ListedColormap
+    custom_cmap = ListedColormap(['#fafab0','#9898ff','#a0faa0'])
+
+    plt.contourf(x0, x1, zz, cmap=custom_cmap)
+    contour = plt.contour(x0, x1, zz1, cmap=plt.cm.brg)
+    plt.clabel(contour, inline=1, fontsize=12)
+    plt.xlabel("Długość płatka", fontsize=14)
+    plt.ylabel("Szerokość płatka", fontsize=14)
+    plt.legend(loc="center left", fontsize=14)
+    plt.axis([0, 7, 0, 3.5])
+    # save_fig("r_4_25")
+    plt.show()
+
+
 # %%
 samples_qty=100
 #TODO zrob cos takiego dla wielu cech, nie tylko jednej z zerową
@@ -582,113 +679,19 @@ if ('X' not in globals() or 'y' not in globals()):
     X = 6 * np.random.rand(samples_qty, 1) - 3
     y = 2 + X + 0.5 * X**2 + np.random.randn(samples_qty, 1)
 
-early_stopping(X,y)
+# early_stopping(X,y)
 
-#graf 
-
-# %% regresja logistyczne
-#przyjzyj sie tym obliczeniom jeszcze
-
-from sklearn.linear_model import LogisticRegression
 
 if 'iris' not in globals():
     from sklearn import datasets
     iris = datasets.load_iris()
     list(iris.keys())
 
-
-#licznie dla jednej cechy
-log_reg = LogisticRegression(solver="lbfgs", random_state=42)
-X=iris['data'][:,3:]      #dlugosc platka
-y=(iris['target']==2).astype(np.int)        #virgnica
-log_reg.fit(X,y)
-X_samples=np.linspace(0,3,1000).reshape(-1, 1)
-preds = log_reg.predict_proba(X_samples)        #oblicza tez przyporzadkowanie negatywne
-decision_boundary = X_samples[preds[:, 1] >= 0.5][0]
-
-plt.plot(X_samples, preds[:, 1], "g-", linewidth=2, label="Iris virginica")
-plt.plot(X_samples, preds[:, 0], "b--", linewidth=2, label="Pozostałe")
-plt.xlabel("Szerokość płatka (cm)", fontsize=14)
-plt.ylabel("Prawdopodobieństwo", fontsize=14)
-plt.legend()
-plt.grid(True)
+#temu sie jeszcz przyjzyj
+logisticRegression(iris)
 
 
-#liczenie dla 2 cech
-from sklearn.linear_model import LogisticRegression
 
-X = iris["data"][:, (2, 3)]  # długość płatka, szerokość płatka
-y = (iris["target"] == 2).astype(np.int)
-
-log_reg = LogisticRegression(solver="lbfgs", C=10**10, random_state=42)
-log_reg.fit(X, y)
-
-x0, x1 = np.meshgrid(
-        np.linspace(2.9, 7, 500).reshape(-1, 1),
-        np.linspace(0.8, 2.7, 200).reshape(-1, 1),
-    )
-X_new = np.c_[x0.ravel(), x1.ravel()]
-
-y_proba = log_reg.predict_proba(X_new)
-
-plt.figure(figsize=(10, 4))
-plt.plot(X[y==0, 0], X[y==0, 1], "bs")
-plt.plot(X[y==1, 0], X[y==1, 1], "g^")
-
-zz = y_proba[:, 1].reshape(x0.shape)
-contour = plt.contour(x0, x1, zz, cmap=plt.cm.brg)
-
-
-left_right = np.array([2.9, 7])
-boundary = -(log_reg.coef_[0][0] * left_right + log_reg.intercept_[0]) / log_reg.coef_[0][1]
-
-plt.clabel(contour, inline=1, fontsize=12)
-plt.plot(left_right, boundary, "k--", linewidth=3)
-plt.text(3.5, 1.5, "Pozostałe", fontsize=14, color="b", ha="center")
-plt.text(6.5, 2.3, "Iris virginica", fontsize=14, color="g", ha="center")
-plt.xlabel("Długość płatka", fontsize=14)
-plt.ylabel("Szerokość płatka", fontsize=14)
-plt.axis([2.9, 7, 0.8, 2.7])
-# save_fig("r_4_24")
-plt.show()
-
-
-#softmax
-X = iris["data"][:, (2, 3)]  # długość płatka, szerokość płatka
-y = iris["target"]
-
-softmax_reg = LogisticRegression(multi_class="multinomial",solver="lbfgs", C=10, random_state=42)
-softmax_reg.fit(X, y)
-x0, x1 = np.meshgrid(
-        np.linspace(0, 8, 500).reshape(-1, 1),
-        np.linspace(0, 3.5, 200).reshape(-1, 1),
-    )
-X_new = np.c_[x0.ravel(), x1.ravel()]
-
-
-y_proba = softmax_reg.predict_proba(X_new)
-y_predict = softmax_reg.predict(X_new)
-
-zz1 = y_proba[:, 1].reshape(x0.shape)
-zz = y_predict.reshape(x0.shape)
-
-plt.figure(figsize=(10, 4))
-plt.plot(X[y==2, 0], X[y==2, 1], "g^", label="Iris virginica")
-plt.plot(X[y==1, 0], X[y==1, 1], "bs", label="Iris versicolor")
-plt.plot(X[y==0, 0], X[y==0, 1], "yo", label="Iris setosa")
-
-from matplotlib.colors import ListedColormap
-custom_cmap = ListedColormap(['#fafab0','#9898ff','#a0faa0'])
-
-plt.contourf(x0, x1, zz, cmap=custom_cmap)
-contour = plt.contour(x0, x1, zz1, cmap=plt.cm.brg)
-plt.clabel(contour, inline=1, fontsize=12)
-plt.xlabel("Długość płatka", fontsize=14)
-plt.ylabel("Szerokość płatka", fontsize=14)
-plt.legend(loc="center left", fontsize=14)
-plt.axis([0, 7, 0, 3.5])
-# save_fig("r_4_25")
-plt.show()
 
 
 
