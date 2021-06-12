@@ -20,7 +20,7 @@ svm_clf = LinearSVC(C=1,loss='hinge')
 
 2) skalowanie danych wielomianowych
 a) reczne dodawnia (dla linearSVC): PolynomialFeatures(degree=3)
-b) wpudowane w jadra: SVC(kernel='poly',degree=3,coef0=1)
+b) wbudowane w jadra: SVC(kernel='poly',degree=3,coef0=1)
 #NOTE: coef0 reguloje proporcje duzych wielomianow do malych 
 
 3) Cechy podobienstwa: Radial Basis Function (RBF) => liczymy gausa do prawdopodobienstwa
